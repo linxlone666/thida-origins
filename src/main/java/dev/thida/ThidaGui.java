@@ -33,6 +33,14 @@ public final class ThidaGui {
       }
   }
 
+  /** Compact HUD surface; menu frames retain their existing layout. */
+  public static void hudPanel(GuiGraphics g, int x, int y, int w, int h, int accent) {
+    g.fill(x, y, x + w, y + h, 0xCF181622);
+    g.fill(x, y, x + 2, y + h, accent);
+    g.fill(x + 2, y, x + w, y + 1, 0xFF50475B);
+    g.fill(x + 2, y + h - 1, x + w, y + h, 0xFF302B3A);
+  }
+
   public static void bar(GuiGraphics g, int x, int y, int w, float progress, int color) {
     g.fill(x, y, x + w, y + 2, 0xFF110F1A);
     int fill = Math.round(w * Math.max(0, Math.min(1, progress)));

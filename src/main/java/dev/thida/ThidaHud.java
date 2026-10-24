@@ -178,8 +178,36 @@ public final class ThidaHud {
         || mc.getDebugOverlay().showDebugScreen()
         || mc.screen != null
         || !ThidaHudConfig.VISIBLE.get()) return;
+    draw(event.getGuiGraphics(), false);
+  }
+
+  static ThidaHudLayout.Bounds previewBounds() {
+    return bounds(3);
+  }
+
+  private static int columns(int count) {
+    int sw = Minecraft.getInstance().getWindow().getGuiScaledWidth();
+    return Math.max(
+        1, Math.min(count, Math.min(ThidaHudConfig.ICONS_PER_ROW.get(), (sw - 16) / 38)));
+  }
+
+  private static ThidaHudLayout.Bounds bounds(int count) {
+    int cols = columns(count), rows = (count + cols - 1) / cols;
+    var area =
+        ThidaHudLayout.fit(
+            ThidaHudConfig.X.get(),
+            ThidaHudConfig.Y.get(),
+            cols * 38,
+            rows * 39,
+            ThidaHudConfig.EFFECT_SCALE.get());
+    int y = ThidaBondHud.avoidOverlap(area.x(), area.y(), area.width(), area.height());
+    return ThidaHudLayout.fit(area.x(), y, cols * 38, rows * 39, ThidaHudConfig.EFFECT_SCALE.get());
+  }
+
+  static void draw(net.minecraft.client.gui.GuiGraphics g, boolean preview) {
+    Minecraft mc = Minecraft.getInstance();
     CompoundTag data = ThidaHudState.snapshot();
-    if (!data.getString("player").equals(mc.player.getUUID().toString())) return;
+    if (!preview && !data.getString("player").equals(mc.player.getUUID().toString())) return;
     List<Badge> badges = new ArrayList<>();
     if (data.getBoolean("thida")) {
       String[][] effects = {{"weak", "bleed", "vulnerable"}, {"shield", "cleanse", "speed"}};
@@ -248,24 +276,22 @@ public final class ThidaHud {
         100,
         0,
         false);
-    if (mc.level != null && previewUntil > mc.level.getGameTime()) {
+    if (preview || mc.level != null && previewUntil > mc.level.getGameTime()) {
       // Local placement sample only: no real effect, cooldown or network state is changed.
       badges.clear();
-      long left = previewUntil - mc.level.getGameTime();
+      long left = preview ? 300 : previewUntil - mc.level.getGameTime();
       add(badges, "speed", "", left + 200, 0, 400, 0, false);
       add(badges, "domain", "", 0, left, 0, 200, false);
       add(badges, "heart", "", 0, 0, 0, 0, true);
     }
     if (badges.isEmpty()) return;
-    int sw = mc.getWindow().getGuiScaledWidth(), sh = mc.getWindow().getGuiScaledHeight();
-    int cols = Math.max(1, Math.min(ThidaHudConfig.ICONS_PER_ROW.get(), (sw - 16) / 38));
-    int rows = (badges.size() + cols - 1) / cols;
-    int x =
-        Math.min(ThidaHudConfig.X.get(), Math.max(0, sw - Math.min(cols, badges.size()) * 38 - 4));
-    int y = Math.min(ThidaHudConfig.Y.get(), Math.max(0, sh - rows * 39 - 4));
-    y = ThidaBondHud.avoidOverlap(x, y, Math.min(cols, badges.size()) * 38, rows * 39);
-    var g = event.getGuiGraphics();
-    if (mc.level != null && previewUntil > mc.level.getGameTime())
+    int cols = columns(badges.size());
+    var area = bounds(badges.size());
+    int x = 0, y = 0;
+    g.pose().pushPose();
+    g.pose().translate(area.x(), area.y(), 0);
+    g.pose().scale(area.scale(), area.scale(), 1);
+    if (!preview && mc.level != null && previewUntil > mc.level.getGameTime())
       ThidaGui.text(
           g,
           ThidaMessages.text("ui.thida.bondhud.drawbonds.2"),
@@ -278,7 +304,7 @@ public final class ThidaHud {
       int bx = x + (i % cols) * 38, by = y + (i / cols) * 39;
       boolean active = badge.phase() == HudTimeline.Phase.ACTIVE;
       int color = active ? 0xFF91DAC2 : ThidaGui.GOLD;
-      ThidaGui.frame(g, bx, by, 34, 35, color, active);
+      ThidaGui.hudPanel(g, bx, by, 34, 35, color);
       ThidaGui.icon(g, badge.icon(), bx + 4, by + 3, 1);
       if (!active) g.fill(bx + 4, by + 3, bx + 20, by + 19, 0x88211D2D);
       if (!active)
@@ -296,6 +322,7 @@ public final class ThidaHud {
                   : ThidaGui.progress(badge.ticks(), badge.total());
       ThidaGui.bar(g, bx + 3, by + 32, 28, progress, color);
     }
+    g.pose().popPose();
   }
 
   private ThidaHud() {}

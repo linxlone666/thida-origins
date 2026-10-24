@@ -346,75 +346,23 @@ public final class ThidaGameTests {
   }
 
   @GameTest(template = "empty")
-  public static void narotraRestoresActualIronManaWithoutStacking(GameTestHelper h) {
+  public static void narotraLinksAndCleansesWithoutManaProvider(GameTestHelper h) {
     run(
         h,
         f -> {
-          if (!net.neoforged.fml.ModList.get().isLoaded("irons_spellbooks")) {
-            FakePlayer owner = f.player(true), target = f.player(false);
-            target.setPos(owner.getX(), owner.getY(), owner.getZ() + 5);
-            completeNarotra(owner, target, 1000);
-            h.assertTrue(
-                state(owner).hasUUID("narotra_doll"),
-                "Narotra still links without Iron's installed");
-            owner.addEffect(new MobEffectInstance(MobEffects.POISON, 100));
-            ThidaPassives.tickAt(owner, state(owner), 1001);
-            h.assertTrue(
-                !owner.hasEffect(MobEffects.POISON),
-                "Narotra still cleanses without Iron's or any particle adapter");
-            return;
-          }
-          FakePlayer owner = f.player(true),
-              target = f.player(false),
-              anotherOwner = f.player(true);
-          var maxMana =
-              BuiltInRegistries.ATTRIBUTE
-                  .getHolder(ResourceLocation.fromNamespaceAndPath("irons_spellbooks", "max_mana"))
-                  .orElseThrow();
-          owner.getAttribute(maxMana).setBaseValue(250);
-          target.getAttribute(maxMana).setBaseValue(400);
-          anotherOwner.getAttribute(maxMana).setBaseValue(200);
-          var ownerMana = io.redspace.ironsspellbooks.api.magic.MagicData.getPlayerMagicData(owner);
-          var targetMana =
-              io.redspace.ironsspellbooks.api.magic.MagicData.getPlayerMagicData(target);
-          var anotherMana =
-              io.redspace.ironsspellbooks.api.magic.MagicData.getPlayerMagicData(anotherOwner);
-          ownerMana.setMana(0);
-          targetMana.setMana(0);
-          anotherMana.setMana(0);
+          ThidaManaIntegration.install(null);
+          FakePlayer owner = f.player(true), target = f.player(false);
           target.setPos(owner.getX(), owner.getY(), owner.getZ() + 5);
           completeNarotra(owner, target, 1000);
-          near(
-              h,
-              ownerMana.getMana(),
-              12.5,
-              "Narotra immediately restores 5% of Thida's actual Iron Max Mana");
-          near(
-              h,
-              targetMana.getMana(),
-              20,
-              "Narotra immediately restores 5% of its target's own Max Mana");
-          ThidaPassives.tickAt(owner, state(owner), 1399);
-          near(h, targetMana.getMana(), 20, "Narotra waits the full 20 seconds");
-          ThidaPassives.tickAt(owner, state(owner), 1400);
-          near(h, ownerMana.getMana(), 25, "Narotra restores Thida again at 20 seconds");
-          near(h, targetMana.getMana(), 40, "Narotra restores its target again at 20 seconds");
-          anotherOwner.setPos(owner.getX(), owner.getY(), owner.getZ());
-          completeNarotra(anotherOwner, target, 1400);
-          near(h, anotherMana.getMana(), 0, "An already reserved target cannot be linked again");
           h.assertTrue(
-              !state(anotherOwner).hasUUID("narotra_doll"),
-              "Duplicate target reservation is rejected");
-          near(
-              h,
-              targetMana.getMana(),
-              40,
-              "Two Narotra sources do not stack the target's mana rate");
-          ownerMana.setMana(249);
-          targetMana.setMana(399);
-          ThidaPassives.tickAt(owner, state(owner), 1800);
-          near(h, ownerMana.getMana(), 250, "Thida mana is capped at Max Mana");
-          near(h, targetMana.getMana(), 400, "Target mana is capped at Max Mana");
+              state(owner).hasUUID("narotra_doll"), "Narotra links without a mana provider");
+          h.assertTrue(
+              !ThidaManaIntegration.restoreFivePercent(owner), "No mana account is invented");
+          owner.addEffect(new MobEffectInstance(MobEffects.POISON, 100));
+          ThidaPassives.tickAt(owner, state(owner), 1001);
+          h.assertTrue(
+              !owner.hasEffect(MobEffects.POISON),
+              "Narotra still cleanses without a mana provider");
         });
   }
 

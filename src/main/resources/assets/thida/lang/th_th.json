@@ -223,5 +223,16 @@
   "ui.thida.spells.validate.4": "สายสัมพันธ์เก่าซ้ำเป้าหมาย กรุณาปลดหนึ่งชนิดก่อน",
   "ui.thida.spells.validate.5": "ต้องถือหุ่นชิ้นที่มีสายสัมพันธ์",
   "ui.thida.spells.validate.6": "เป้าหมายออฟไลน์หรือไม่พร้อม",
-  "ui.thida.spells.validate.7": "คาถายังติดคูลดาวน์"
+  "ui.thida.spells.validate.7": "คาถายังติดคูลดาวน์",
+  "key.thida.edit_hud": "จัด HUD ธิดา",
+  "hud.thida.reset": "คืนค่าแผงนี้",
+  "hud.thida.panel.bonds": "สายสัมพันธ์",
+  "hud.thida.panel.effects": "ไอคอนสกิล",
+  "hud.thida.panel.recipient": "ผู้รับพันธะ",
+  "hud.thida.editor.hint": "ลากเพื่อย้าย · ลูกกลิ้งปรับขนาด",
+  "hud.thida.kind.narotra": "นรตรา",
+  "hud.thida.kind.nilakan": "นิลกาล",
+  "hud.thida.kind.parasite": "กาฝาก",
+  "hud.thida.kind.heart": "พันธะหทัย",
+  "hud.thida.done": "บันทึก"
 }

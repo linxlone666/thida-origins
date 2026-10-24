@@ -15,6 +15,14 @@ public final class ThidaHudConfig {
   public static final ModConfigSpec.IntValue BOND_Y = B.defineInRange("bondHudY", 8, 0, 4096);
   public static final ModConfigSpec.IntValue RECIPIENT_Y =
       B.defineInRange("recipientHudOffsetY", -80, -4096, 0);
+  public static final ModConfigSpec.IntValue RECIPIENT_X =
+      B.defineInRange("recipientHudOffsetX", 0, -4096, 4096);
+  public static final ModConfigSpec.DoubleValue BOND_SCALE =
+      B.defineInRange("bondHudScale", 1.0, .6, 1.4);
+  public static final ModConfigSpec.DoubleValue EFFECT_SCALE =
+      B.defineInRange("effectHudScale", .9, .6, 1.4);
+  public static final ModConfigSpec.DoubleValue RECIPIENT_SCALE =
+      B.defineInRange("recipientHudScale", .9, .6, 1.4);
   public static final ModConfigSpec.BooleanValue INPUT_V7 =
       B.define("inputDefaultsV7Migrated", false);
   public static final ModConfigSpec SPEC = B.build();

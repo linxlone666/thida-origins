@@ -4,8 +4,8 @@
 
 | API | หน้าที่ | ไม่มี provider |
 |---|---|---|
-| ThidaManaIntegration.Adapter | ฟื้นมานา Passive จาก Max Mana ของผู้รับ | ใช้ Iron’s เฉพาะเมื่อมีอยู่ มิฉะนั้นข้ามการฟื้นมานา |
-| ThidaSkillIntegration.Adapter | ผลหลังสเกลและราคาคาถา Skill 1 / ลดดาเมจหลังกาฝากแตก | ปิดเฉพาะคาถาที่ยังไม่มีข้อมูล ไม่ร่ายฟรี |
+| ThidaManaIntegration.Adapter | ฟื้นมานา Passive จาก Max Mana ของผู้รับ | ข้ามเฉพาะการฟื้นมานา |
+| ThidaSkillIntegration.Adapter | ผลหลังสเกลและราคาคาถา Skill 1 / ลดดาเมจหลังกาฝากแตก | ใช้ค่าพื้นฐานที่ยืนยันในรุ่น 0.8.1 และร่ายฟรี |
 | ThidaHealing | ระบุผู้ฮีล/ผู้รับ/ชนิดฮีลของ Skill 3 | แหล่งไม่ทราบให้ฮีลก่อนแล้วจบพันธะ |
 
 ลงทะเบียนบน server lifecycle ด้วย install(adapter), ถอดด้วย install(null); ServerStopped reset provider ให้ไม่ค้างข้ามเซิร์ฟเวอร์
@@ -18,15 +18,16 @@ maxMana(player) อ่าน Max Mana ของ **ผู้รับแต่ล
 restore(player, amount, maximum) เพิ่มมานาปัจจุบันและ cap ไม่เกิน maximum; คืน true เมื่อรองรับการดำเนินการ
 ระบบธิดาคำนวณ 5% เองและดูแลรอบ 20 วินาที/ไม่เร่งตามหลายสายสัมพันธ์ ผู้ทำ adapter ไม่ต้องมี timer อีกชุด
 provider ต้อง cap ยอดมานาภายใน restore โดยใช้ current mana ของระบบนั้น สัญญาเดิมไม่เปิดช่องให้ Thida อ่าน/เขียนบัญชีมานาโดยตรง
-provider ส่วนตัวมีลำดับเหนือ Iron’s แม้ส่วนตัวคืนข้อมูลไม่พร้อม/NaN/Infinity/ติดลบ ก็ไม่เติมอีกระบบแทนโดยเงียบ ๆ
+ข้อมูลไม่พร้อม/NaN/Infinity/ติดลบจะไม่เติมมานา และไม่สร้างบัญชีมานาหรือเปลี่ยนไปใช้ระบบอื่น
 ข้อผิดพลาด provider ถูกจับและบันทึกครั้งเดียว ไม่ทำให้ระบบพันธะหรือสกิลอื่นล่ม
-ThidaIronMana เป็นคลาส optional ที่โหลดหลังตรวจ ModList เท่านั้น ไม่มี dependency มานาส่วนตัวหรือ AAA บังคับ
+ไม่มี adapter ของ Iron’s Spellbooks แล้ว และไม่มี dependency มานาส่วนตัวหรือ AAA บังคับ
 
 ## ค่าและหน่วย Skill 1
 
 Quote.percent ใช้ fraction: 0.20 หมายถึง 20%; healHp/bleedHp หน่วย HP (2 HP = หนึ่งหัวใจ)
 ตัวตั้งต้นที่ยืนยันคือ 20% และเลือดไหล 2 HP/วินาที แต่ Quote ต้องคืน **ผลสุดท้ายหลังสเกล**; Thida ไม่คูณพลังเวทย์ซ้ำ
-ฐานฮีล สูตรแปลงพลังเวทย์ เพดาน และค่ามานายังไม่กำหนด ไม่ใช้ตัวเลขใน test เป็นสูตรเล่นจริง
+เมื่อไม่มี adapter: percent=0.20, bleedHp=2, ฮีลนรตรา 4 เท่ากับ 20% ของ Max HP เป้าหมาย และ payment ไม่มีค่าใช้จ่าย ลดดาเมจหลังกาฝากแตก 0.20 เป็นค่าที่เจ้าของงานยืนยันสำหรับเล่นโดยไม่ใช้ระบบสเกล
+เมื่อมี adapter จะใช้ผลลัพธ์และ payment ของ provider เท่านั้น หาก provider ไม่พร้อมหรือข้อมูลผิดจะปฏิเสธการร่าย ไม่เปลี่ยนไปร่ายฟรี สูตรแปลงพลังเวทย์และราคาในระบบภายนอกให้ผู้พัฒนาม็อดนั้นกำหนด
 ThidaSpell ให้ ID ที่อ่านง่าย และ map ไป storage index 0/1/2 กับเลขเอกสาร 2/3/4 โดยไม่เปลี่ยน NBT เก่า
 method quote(ServerPlayer, ThidaSpell) bridge เข้าสัญญา String/int เดิมเพื่อไม่บังคับให้ provider เก่าพัง; ผู้เขียนใหม่ใช้ ThidaSpell.find หรือ enum โดยตรง
 
@@ -43,8 +44,8 @@ Payment ของ Resolution ถูกห่อ one-shot และมีตั�
 Resolution แยก READY, UNAVAILABLE (ยังไม่ติดตั้ง), NOT_READY (provider ยังไม่พร้อม), INVALID (ข้อมูล/การเรียกใช้ไม่ได้)
 กรณี consume คืน false แจ้งมานาไม่พอ ค่าร่ายและราคาไม่ต้องเผยในข้อความผู้เล่น
 
-parasiteBreakReduction(caster, target) คืน fraction ผลสุดท้ายสำหรับบัฟเป้าหมาย 10 วินาที; Optional.empty เมื่อสูตรยังไม่พร้อม
-ตัวจับเวลาและโบนัสอื่นของกาฝากยังเดินตามเดิม ไม่สร้างสูตรทดแทน
+parasiteBreakReduction(caster, target) คืน fraction ผลสุดท้ายสำหรับบัฟเป้าหมาย 10 วินาที; หากไม่มี adapter ใช้ 0.20 หากติดตั้ง adapter แล้วคืน Optional.empty จะไม่เพิ่มผลลดดาเมจส่วนนี้
+install(null) คืนสู่โหมดค่าพื้นฐาน ไม่ปิด Skill 1; การฟื้นมานา Passive ยังคงต้องมี ThidaManaIntegration.Adapter แยกต่างหาก
 ตัวอย่างใน docs/examples/PersonalProviderExample.java ใช้ facade ที่ประกาศในไฟล์เอง ไม่ใช่การเดาชื่อ API ของม็อดส่วนตัว
 ตัวอย่างไม่ลงทะเบียนใน JAR และไม่กำหนดสูตรสมดุล
 

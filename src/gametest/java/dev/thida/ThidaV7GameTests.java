@@ -317,15 +317,79 @@ public final class ThidaV7GameTests {
   }
 
   @GameTest(template = "empty")
-  public static void noManaAdapterRejectsSpellWithoutCooldown(GameTestHelper h) {
+  public static void standaloneSpellsUseBasePowerAndTargetsMaximumHealth(GameTestHelper h) {
+    run(
+        h,
+        (a, b) -> {
+          ThidaSkillIntegration.install(null);
+          passive(a, b, "narotra_doll");
+          float maximum = b.getMaxHealth();
+          ThidaSpells.cast(a, "narotra_doll", 0);
+          h.assertTrue(
+              ThidaBonds.data(a).contains("spellCd_narotra_doll_0"),
+              "Standalone cast starts cooldown");
+          b.hurt(b.damageSources().generic(), 25);
+          near(h, b.getHealth(), maximum - 20);
+          b.setHealth(maximum * .5f);
+          ThidaSpells.cast(a, "narotra_doll", 2);
+          near(h, b.getHealth(), maximum * .7f);
+          h.assertTrue(
+              ThidaSkillIntegration.breakReduction(a, b).orElseThrow() == .2,
+              "Standalone parasite defense is 20%");
+        });
+  }
+
+  @GameTest(template = "empty")
+  public static void standaloneBleedAndCleanseWorkWithoutProvider(GameTestHelper h) {
+    run(
+        h,
+        (a, b) -> {
+          ThidaSkillIntegration.install(null);
+          passive(a, b, "narotra_doll");
+          b.addEffect(new MobEffectInstance(MobEffects.POISON, 100));
+          ThidaSpells.cast(a, "narotra_doll", 1);
+          h.assertTrue(
+              !b.hasEffect(MobEffects.POISON), "Standalone cleanse removes existing debuffs");
+          ThidaPassives.unlink(a, "narotra_doll", "TEST");
+          passive(a, b, "nilakan_doll");
+          ThidaSpells.cast(a, "nilakan_doll", 1);
+          var spell = ThidaBondData.child(ThidaBonds.data(a), "spells").getCompound("nilakan_doll");
+          near(h, spell.getFloat("bleedHp"), 2);
+          h.assertTrue(
+              b.hasEffect(ThidaMod.SPELL_BLEED) && b.hasEffect(MobEffects.BLINDNESS),
+              "Standalone bleed and blindness both apply");
+        });
+  }
+
+  @GameTest(template = "empty")
+  public static void installedButUnreadyProviderNeverFallsBackToFreeCasting(GameTestHelper h) {
     run(
         h,
         (a, b) -> {
           passive(a, b, "narotra_doll");
+          ThidaSkillIntegration.install(
+              new ThidaSkillIntegration.Adapter() {
+                public Optional<ThidaSkillIntegration.Quote> quote(
+                    ServerPlayer caster, String doll, int spell) {
+                  return Optional.empty();
+                }
+
+                public Optional<Double> parasiteBreakReduction(
+                    ServerPlayer caster, ServerPlayer target) {
+                  return Optional.empty();
+                }
+              });
           ThidaSpells.cast(a, "narotra_doll", 0);
           h.assertTrue(
               !ThidaBonds.data(a).contains("spellCd_narotra_doll_0"),
-              "No guessed mana, no cooldown");
+              "Unready provider never casts for free");
+          h.assertTrue(
+              ThidaSkillIntegration.breakReduction(a, b).isEmpty(),
+              "Installed provider controls defense too");
+          ThidaSkillIntegration.install(null);
+          h.assertTrue(
+              ThidaSpells.failure(a, "narotra_doll", 0).isEmpty(),
+              "Removing provider restores approved base mode");
         });
   }
 
@@ -569,8 +633,7 @@ public final class ThidaV7GameTests {
   }
 
   @GameTest(template = "empty")
-  public static void personalManaOverridesOptionalIronAndUsesEachRecipientsMaximum(
-      GameTestHelper h) {
+  public static void personalManaUsesEachRecipientsMaximum(GameTestHelper h) {
     run(
         h,
         (a, b) -> {
@@ -599,7 +662,7 @@ public final class ThidaV7GameTests {
   }
 
   @GameTest(template = "empty")
-  public static void invalidPersonalMaximumDoesNotFallThroughToIron(GameTestHelper h) {
+  public static void invalidPersonalMaximumDoesNotRestoreMana(GameTestHelper h) {
     run(
         h,
         (a, b) -> {
@@ -615,7 +678,7 @@ public final class ThidaV7GameTests {
               });
           h.assertTrue(
               !ThidaManaIntegration.restoreFivePercent(a),
-              "Reject invalid maximum without invoking Iron");
+              "Reject invalid maximum without restoring mana");
         });
   }
 

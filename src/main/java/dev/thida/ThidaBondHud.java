@@ -11,7 +11,6 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.resources.DefaultPlayerSkin;
 import net.minecraft.client.resources.PlayerSkin;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.network.chat.Component;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -22,9 +21,7 @@ import net.neoforged.neoforge.client.event.RenderGuiEvent;
 @EventBusSubscriber(modid = "thida", value = Dist.CLIENT)
 public final class ThidaBondHud {
   private static final Map<UUID, PlayerSkin> SKINS = new HashMap<>();
-  private static final int WIDTH = 236;
-  private static int dragX = -1, dragY = -1;
-  private static int recipientDragY = -1;
+  private static final int WIDTH = 208;
 
   private record Row(String kind, CompoundTag data) {}
 
@@ -33,7 +30,6 @@ public final class ThidaBondHud {
   @SubscribeEvent
   public static void logout(ClientPlayerNetworkEvent.LoggingOut event) {
     SKINS.clear();
-    dragX = dragY = -1;
   }
 
   private static PlayerSkin skin(UUID id) {
@@ -59,18 +55,24 @@ public final class ThidaBondHud {
   }
 
   private static int x() {
-    return dragX < 0 ? ThidaHudConfig.BOND_X.get() : dragX;
+    return ThidaHudConfig.BOND_X.get();
   }
 
   private static int y() {
-    return dragY < 0 ? ThidaHudConfig.BOND_Y.get() : dragY;
+    return ThidaHudConfig.BOND_Y.get();
   }
 
   public static int avoidOverlap(int x, int y, int width, int height) {
     int count = rows().size();
-    if (count == 0) return y;
-    int bx = x(), by = y(), bh = 22 + count * 31;
-    return x < bx + WIDTH && x + width > bx && y < by + bh && y + height > by ? by + bh + 8 : y;
+    boolean editor = Minecraft.getInstance().screen instanceof ThidaHudEditor;
+    if (count == 0 && !editor) return y;
+    var area = bondBounds(editor);
+    return x < area.x() + area.width()
+            && x + width > area.x()
+            && y < area.y() + area.height()
+            && y + height > area.y()
+        ? area.y() + area.height() + 6
+        : y;
   }
 
   @SubscribeEvent
@@ -78,13 +80,18 @@ public final class ThidaBondHud {
     var mc = Minecraft.getInstance();
     if (mc.player == null
         || mc.options.hideGui
-        || mc.screen != null && !(mc.screen instanceof PositionScreen)) return;
-    if (mc.screen instanceof PositionScreen) return;
+        || mc.screen != null
+        || !ThidaHudConfig.VISIBLE.get()) return;
     drawBonds(event.getGuiGraphics(), false);
     drawRecipient(event.getGuiGraphics(), false);
   }
 
-  private static void drawBonds(GuiGraphics g, boolean preview) {
+  static ThidaHudLayout.Bounds bondBounds(boolean preview) {
+    int count = preview ? Math.max(1, rows().size()) : rows().size();
+    return ThidaHudLayout.fit(x(), y(), WIDTH, 21 + count * 34, ThidaHudConfig.BOND_SCALE.get());
+  }
+
+  static void drawBonds(GuiGraphics g, boolean preview) {
     var mc = Minecraft.getInstance();
     var rows = rows();
     if (rows.isEmpty() && preview) {
@@ -93,19 +100,20 @@ public final class ThidaBondHud {
       n.putString("name", ThidaMessages.text("ui.thida.bondhud.drawbonds.1"));
       n.putFloat("hp", 100);
       n.putFloat("maxHp", 100);
+      n.putBoolean("available", true);
       n.putString("status", ThidaMessages.text("ui.thida.bondhud.drawbonds.2"));
       rows.add(new Row("narotra_doll", n));
     }
     if (rows.isEmpty()) return;
-    int x = Math.min(x(), Math.max(0, mc.getWindow().getGuiScaledWidth() - WIDTH));
-    int h = 22 + rows.size() * 31,
-        y = Math.min(y(), Math.max(0, mc.getWindow().getGuiScaledHeight() - h));
-    ThidaGui.frame(g, x, y, WIDTH, h, 0xFF91DAC2, true);
+    var area = bondBounds(preview);
+    g.pose().pushPose();
+    g.pose().translate(area.x(), area.y(), 0);
+    g.pose().scale(area.scale(), area.scale(), 1);
+    int x = 0, y = 0, h = 21 + rows.size() * 34;
+    ThidaGui.hudPanel(g, x, y, WIDTH, h, 0xFF91DAC2);
     ThidaGui.text(
         g,
-        preview
-            ? ThidaMessages.text("ui.thida.bondhud.drawbonds.3")
-            : ThidaMessages.text("ui.thida.bondhud.drawbonds.4"),
+        ThidaMessages.text("ui.thida.bondhud.drawbonds.4"),
         x + 7,
         y + 6,
         WIDTH - 14,
@@ -113,7 +121,7 @@ public final class ThidaBondHud {
     for (int i = 0; i < rows.size(); i++) {
       var row = rows.get(i);
       var n = row.data();
-      int ry = y + 20 + i * 31;
+      int ry = y + 19 + i * 34;
       String icon =
           row.kind().startsWith("narotra")
               ? "narotra"
@@ -123,29 +131,42 @@ public final class ThidaBondHud {
         PlayerFaceRenderer.draw(g, skin(UUID.fromString(n.getString("id"))), x + 25, ry + 2, 22);
       } catch (IllegalArgumentException ignored) {
       }
-      ThidaGui.text(g, n.getString("name"), x + 53, ry + 2, 174, ThidaGui.TEXT);
+      ThidaGui.text(g, n.getString("name"), x + 53, ry + 2, WIDTH - 61, ThidaGui.TEXT);
       String hp =
           String.format(
-                  java.util.Locale.ROOT, "%.1f / %.1f HP", n.getFloat("hp"), n.getFloat("maxHp"))
-              .replace(" HP", ThidaMessages.text("ui.thida.bondhud.drawbonds.5"));
+              java.util.Locale.ROOT, "%.0f / %.0f", n.getFloat("hp"), n.getFloat("maxHp"));
+      String kind = ThidaMessages.text("hud.thida.kind." + icon);
       ThidaGui.text(
           g,
-          hp + " • " + n.getString("status"),
+          kind + " · " + (n.getBoolean("available") ? hp : n.getString("status")),
           x + 53,
           ry + 15,
-          174,
+          WIDTH - 61,
+          n.getBoolean("available") ? 0xFF91DAC2 : ThidaGui.GOLD);
+      float health = n.getFloat("maxHp") > 0 ? n.getFloat("hp") / n.getFloat("maxHp") : 0;
+      ThidaGui.bar(
+          g,
+          x + 53,
+          ry + 28,
+          WIDTH - 61,
+          health,
           n.getBoolean("available") ? 0xFF91DAC2 : ThidaGui.GOLD);
     }
+    g.pose().popPose();
   }
 
-  private static int recipientTop() {
-    int height = Minecraft.getInstance().getWindow().getGuiScaledHeight();
-    int requested =
-        recipientDragY >= 0 ? recipientDragY : height + ThidaHudConfig.RECIPIENT_Y.get();
-    return Math.max(6, Math.min(height - 76, Math.max(height / 2 + 12, requested)));
+  static ThidaHudLayout.Bounds recipientBounds() {
+    var window = Minecraft.getInstance().getWindow();
+    int width = Math.min(286, window.getGuiScaledWidth() - 12);
+    double scale = ThidaHudConfig.RECIPIENT_SCALE.get();
+    int x =
+        (window.getGuiScaledWidth() - (int) Math.ceil(width * scale)) / 2
+            + ThidaHudConfig.RECIPIENT_X.get();
+    return ThidaHudLayout.fit(
+        x, window.getGuiScaledHeight() + ThidaHudConfig.RECIPIENT_Y.get(), width, 34, scale);
   }
 
-  private static void drawRecipient(GuiGraphics g, boolean preview) {
+  static void drawRecipient(GuiGraphics g, boolean preview) {
     var mc = Minecraft.getInstance();
     var data = ThidaHudState.snapshot().getCompound("recipient");
     if (preview) {
@@ -154,14 +175,17 @@ public final class ThidaBondHud {
       data.putLong("ward", 3600);
       data.putLong("speed", 1000);
     }
-    long ward = ThidaHudState.remaining(data.getLong("ward")),
-        speed = ThidaHudState.remaining(data.getLong("speed"));
+    long ward = preview ? 3600 : ThidaHudState.remaining(data.getLong("ward")),
+        speed = preview ? 1000 : ThidaHudState.remaining(data.getLong("speed"));
     long immune = ThidaHudState.remaining(data.getLong("invulnerable"));
     if (!data.getBoolean("active") && ward == 0 && speed == 0 && immune == 0) return;
-    int w = Math.min(296, mc.getWindow().getGuiScaledWidth() - 12), h = 32;
-    int x = (mc.getWindow().getGuiScaledWidth() - w) / 2;
-    int y = recipientTop();
-    ThidaGui.frame(g, x, y, w, h, 0xFFF0E9DA, true);
+    var area = recipientBounds();
+    g.pose().pushPose();
+    g.pose().translate(area.x(), area.y(), 0);
+    g.pose().scale(area.scale(), area.scale(), 1);
+    int w = Math.min(286, mc.getWindow().getGuiScaledWidth() - 12), h = 34;
+    int x = 0, y = 0;
+    ThidaGui.hudPanel(g, x, y, w, h, ThidaGui.GOLD);
     String status =
         preview
             ? ThidaMessages.text("ui.thida.bondhud.drawrecipient.1")
@@ -185,100 +209,13 @@ public final class ThidaBondHud {
             ? ThidaMessages.text("ui.thida.bondhud.drawrecipient.9")
             : String.join(" • ", parts);
     ThidaGui.text(g, timers, x + 7, y + 19, w - 14, ThidaGui.GOLD);
+    g.pose().popPose();
   }
 
-  public static final class PositionScreen extends Screen {
-    private final Screen parent;
-    private boolean dragging, draggingRecipient;
-    private double offsetX, offsetY;
-
+  /** Compatibility entry point for existing HUD commands. */
+  public static final class PositionScreen extends ThidaHudEditor {
     public PositionScreen(Screen parent) {
-      super(Component.literal(ThidaMessages.text("ui.thida.bondhud.drawrecipient.10")));
-      this.parent = parent;
-    }
-
-    @Override
-    public boolean isPauseScreen() {
-      return false;
-    }
-
-    @Override
-    public void render(GuiGraphics g, int mouseX, int mouseY, float partial) {
-      renderBackground(g, mouseX, mouseY, partial);
-      drawBonds(g, true);
-      drawRecipient(g, true);
-      ThidaGui.text(
-          g,
-          ThidaMessages.text("ui.thida.bondhud.render.1"),
-          8,
-          height - 18,
-          width - 16,
-          ThidaGui.TEXT);
-      super.render(g, mouseX, mouseY, partial);
-    }
-
-    @Override
-    public boolean mouseClicked(double mx, double my, int button) {
-      if (button == 1) {
-        onClose();
-        return true;
-      }
-      int recipientWidth = Math.min(296, width - 12), recipientX = (width - recipientWidth) / 2;
-      if (button == 0
-          && mx >= recipientX
-          && mx <= recipientX + recipientWidth
-          && my >= recipientTop()
-          && my <= recipientTop() + 32) {
-        draggingRecipient = true;
-        offsetY = my - recipientTop();
-        return true;
-      }
-      if (button == 0
-          && mx >= x()
-          && mx <= x() + WIDTH
-          && my >= y()
-          && my <= y() + 22 + Math.max(1, rows().size()) * 31) {
-        dragging = true;
-        offsetX = mx - x();
-        offsetY = my - y();
-        return true;
-      }
-      return true;
-    }
-
-    @Override
-    public boolean mouseDragged(double mx, double my, int button, double dx, double dy) {
-      if (draggingRecipient) {
-        recipientDragY = (int) Math.max(6, Math.min(height - 76, my - offsetY));
-        return true;
-      }
-      if (dragging) {
-        dragX = (int) Math.max(0, Math.min(width - Math.min(WIDTH, width), mx - offsetX));
-        dragY = (int) Math.max(0, Math.min(height - 53, my - offsetY));
-      }
-      return true;
-    }
-
-    @Override
-    public boolean mouseReleased(double x, double y, int button) {
-      dragging = draggingRecipient = false;
-      return true;
-    }
-
-    @Override
-    public void onClose() {
-      if (dragX >= 0) {
-        ThidaHudConfig.BOND_X.set(dragX);
-        ThidaHudConfig.BOND_Y.set(dragY);
-        ThidaHudConfig.BOND_X.save();
-      }
-      if (recipientDragY >= 0) {
-        ThidaHudConfig.RECIPIENT_Y.set(recipientTop() - height);
-        ThidaHudConfig.RECIPIENT_Y.save();
-      }
-      recipientDragY = -1;
-      dragX = dragY = -1;
-      minecraft.setScreen(parent);
+      super(parent);
     }
   }
 }

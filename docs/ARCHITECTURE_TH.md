@@ -1,4 +1,4 @@
-# โครงสร้างโปรเจกต์ 0.8.0
+# โครงสร้างโปรเจกต์ 0.8.1
 
 | ส่วน | หน้าที่ |
 |---|---|
@@ -8,9 +8,9 @@
 | ThidaBonds | กาฝาก/หทัย การยืนยัน เงื่อนไข HP วงจรชีวิต |
 | ThidaSpells / ThidaSpell | คาถา Skill 1 และ ID/เลขคาถาที่เก็บได้แบบเดิม |
 | ThidaSkillIntegration / ThidaManaIntegration / ThidaHealing | API ค่าร่าย/สเกล ฟื้นมานา และการระบุผู้ฮีล |
-| ThidaIronMana | ส่วนเดียวที่รู้จัก API Iron’s โหลดเฉพาะเมื่อ mod มีอยู่ |
 | ThidaDollInventory / mixin หุ่น | กฎห้ามโยน/ย้ายออก รักษาหุ่นขณะย้ายช่องและหลังเกิดใหม่ |
 | ThidaClient / ThidaHud / ThidaBondHud | ปุ่ม เมนู รายชื่อ สกิน และตำแหน่งในเครื่อง |
+| ThidaHudEditor / ThidaHudLayout | หน้าจัด HUD ผ่าน H ขนาด/ตำแหน่งรายแผง และกรอบรับเมาส์ตรงกับภาพที่ย่อขยาย |
 | ThidaNetwork | ช่องข้อมูล server-authoritative; ภาพไม่มี clientbound-to-server action |
 | ThidaPassiveEffects / ThidaSkillEffects | dispatcher ภาพเส้นทางเดียวและนโยบายผู้มองเห็น |
 | ThidaEffectProjection | อ่านสถานะจริงเป็นภาพต่อเนื่อง ไม่เดิน timer เกมซ้ำ |
@@ -24,6 +24,7 @@
 ThidaSpells.validate → ThidaSkillIntegration.resolve หนึ่งครั้งต่อการร่าย → Payment.consume หนึ่งครั้ง → แทนคาถาเก่า/บันทึกผลและ CD → ส่งภาพ
 เมนูเรียก resolve เพื่ออ่านอย่างเดียว ไม่ consume
 Payment ของ resolution เป็น one-shot และกัน reentrant cast ต่อผู้เล่น ถ้าจ่ายไม่ผ่านผลเก่าและ CD เดิมไม่ถูกแตะ
+ไม่มี provider ใช้ค่าพื้นฐาน 20%, ฮีล 20% Max HP เป้าหมาย, เลือดไหล 2 HP และร่ายฟรี; provider ที่ติดตั้งแล้วทำงานไม่สำเร็จจะไม่ย้อนกลับมาใช้โหมดฟรี
 
 ## ข้อมูลเก่า
 

@@ -1,0 +1,13 @@
+{
+  "version": "0.8.1-neoforge-dev",
+  "tag": "v0.8.1-neoforge-dev",
+  "reconstructed_history": true,
+  "source_snapshot_available": true,
+  "checked_out_source_snapshot": "0.8.1-neoforge-dev",
+  "source_snapshot_label": "source",
+  "source_archive_sha256": null,
+  "artifact": "thida-origins-1.21.1-neoforge-0.8.1-neoforge-dev.jar",
+  "artifact_sha256": "40fc998de515853792fe5f7319f6a290608220d0bdefb914181f17e65309101c",
+  "summary": "Recover standalone spell defaults and separate HUD editor",
+  "note": "Recovered source snapshot, not an original historical Git commit. Source and binary were not rebuilt to claim reproducible correspondence."
+}

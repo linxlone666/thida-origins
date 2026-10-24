@@ -22,6 +22,7 @@ public final class ThidaClient {
   public static final KeyMapping OPEN_MENU = key("open_doll_menu", GLFW.GLFW_KEY_1);
   public static final KeyMapping SUMMON = key("summon_parasite", GLFW.GLFW_KEY_2);
   public static final KeyMapping HEART = key("heart_bond", GLFW.GLFW_KEY_3);
+  public static final KeyMapping EDIT_HUD = key("edit_hud", GLFW.GLFW_KEY_H);
 
   static {
     ThidaClientEffects.installConfirmation(ThidaClient::confirmation);
@@ -43,6 +44,7 @@ public final class ThidaClient {
       e.register(OPEN_MENU);
       e.register(SUMMON);
       e.register(HEART);
+      e.register(EDIT_HUD);
     }
   }
 
@@ -88,6 +90,10 @@ public final class ThidaClient {
       drainConflicts(HEART);
       request("heart", "", 0);
     }
+    while (EDIT_HUD.consumeClick()) {
+      drainConflicts(EDIT_HUD);
+      mc.setScreen(new ThidaBondHud.PositionScreen(null));
+    }
   }
 
   public static void openMenu() {
@@ -97,7 +103,10 @@ public final class ThidaClient {
     for (String id : new String[] {"narotra_doll", "nilakan_doll"})
       if (mc.player.getMainHandItem().is(ThidaMod.ABILITIES.get(id).get())
           || mc.player.getOffhandItem().is(ThidaMod.ABILITIES.get(id).get())) held.add(id);
-    mc.setScreen(new WheelScreen(null, ThidaMessages.text("power.thida.arts.name"), choices(held)));
+    if (held.size() == 1) spells(held.getFirst());
+    else
+      mc.setScreen(
+          new WheelScreen(null, ThidaMessages.text("power.thida.arts.name"), choices(held)));
   }
 
   private record Choice(String icon, String title, String reason, Runnable action) {}
@@ -120,14 +129,6 @@ public final class ThidaClient {
               ThidaMessages.text("ui.thida.client.choices.3"),
               ThidaMessages.text("ui.thida.client.choices.4"),
               () -> {}));
-    rows.add(
-        new Choice(
-            "unlink",
-            ThidaMessages.text("ui.thida.bondhud.drawrecipient.10"),
-            "",
-            () ->
-                Minecraft.getInstance()
-                    .setScreen(new ThidaBondHud.PositionScreen(Minecraft.getInstance().screen))));
     return rows;
   }
 
@@ -295,7 +296,7 @@ public final class ThidaClient {
 
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partial) {
-      renderBackground(g, mouseX, mouseY, partial);
+      super.render(g, mouseX, mouseY, partial);
       int w = Math.min(380, width - 16),
           h = 51 + rows.size() * 35,
           x = (width - w) / 2,
@@ -327,7 +328,6 @@ public final class ThidaClient {
           y + h - 15,
           w - 20,
           ThidaGui.MUTED);
-      super.render(g, mouseX, mouseY, partial);
     }
   }
 
