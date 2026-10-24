@@ -2,7 +2,7 @@
 
 Checked-out source snapshot: **forge-passives-pre-port**.
 
-Latest archived milestone: **0.6.0-neoforge-dev**.
+Latest archived milestone: **0.6.1-neoforge-dev**.
 
 Only the original JAR and release notes survived. No source was inferred or decompiled. The checked-out source remains the last recovered source snapshot.
 
