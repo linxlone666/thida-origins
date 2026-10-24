@@ -1,0 +1,13 @@
+{
+  "version": "0.8.4-neoforge-dev",
+  "tag": "v0.8.4-neoforge-dev",
+  "reconstructed_history": true,
+  "source_snapshot_available": true,
+  "checked_out_source_snapshot": "0.8.4-neoforge-dev",
+  "source_snapshot_label": "source",
+  "source_archive_sha256": null,
+  "artifact": "thida-origins-1.21.1-neoforge-0.8.4-neoforge-dev.jar",
+  "artifact_sha256": "69977ed76a978d7cebd24e7805a03e4fa0d10dbaafd23fcf29749b2f06f485ee",
+  "summary": "Add isolated Thida font styling and optional local font pack support",
+  "note": "Recovered source snapshot, not an original historical Git commit. Source and binary were not rebuilt to claim reproducible correspondence."
+}

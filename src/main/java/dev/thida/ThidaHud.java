@@ -216,7 +216,7 @@ public final class ThidaHud {
   private static HudPacking.Flow flow(List<Badge> badges) {
     var font = Minecraft.getInstance().font;
     var widths = new ArrayList<Integer>();
-    for (var badge : badges) widths.add(Math.max(34, font.width("888:88") + 6));
+    for (var badge : badges) widths.add(Math.max(34, ThidaGui.width("888:88") + 6));
     return HudPacking.flow(
         widths,
         ThidaHudLayout.available(ThidaHudConfig.EFFECT_SCALE.get(), 248),
@@ -365,7 +365,7 @@ public final class ThidaHud {
       ThidaGui.text(
           g,
           timer,
-          bx + Math.max(2, (width - mc.font.width(timer)) / 2),
+          bx + Math.max(2, (width - ThidaGui.width(timer)) / 2),
           by + 22,
           width - 4,
           color);

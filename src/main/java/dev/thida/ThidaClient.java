@@ -374,4 +374,12 @@ public final class ThidaClient {
   }
 
   private ThidaClient() {}
+
+  @SubscribeEvent(priority = net.neoforged.bus.api.EventPriority.LOWEST)
+  public static void tooltipFont(
+      net.neoforged.neoforge.event.entity.player.ItemTooltipEvent event) {
+    if (ThidaEvents.id(event.getItemStack()).isEmpty()) return;
+    var lines = event.getToolTip();
+    for (int i = 0; i < lines.size(); i++) lines.set(i, ThidaGui.styled(lines.get(i)));
+  }
 }

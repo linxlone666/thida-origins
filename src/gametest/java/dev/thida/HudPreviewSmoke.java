@@ -40,6 +40,11 @@ public final class HudPreviewSmoke {
       switch (stage++) {
         case 0 -> {
           persistence(mc, false);
+          LogUtils.getLogger()
+              .info(
+                  "THIDA_FONT_METRICS: default={} thida={}",
+                  mc.font.width("ความเร็ว ทดสอบ"),
+                  ThidaGui.width("ความเร็ว ทดสอบ"));
           ThidaHudConfig.BOND_X.set(8);
           ThidaHudConfig.BOND_Y.set(8);
           ThidaHudConfig.X.set(8);

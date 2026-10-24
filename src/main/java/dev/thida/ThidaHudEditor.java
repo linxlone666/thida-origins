@@ -39,6 +39,8 @@ public class ThidaHudEditor extends Screen {
         Button.builder(Component.translatable("hud.thida.done"), b -> onClose())
             .bounds(x + 170, y, 88, 20)
             .build());
+    for (var child : children())
+      if (child instanceof Button button) button.setMessage(ThidaGui.styled(button.getMessage()));
   }
 
   @Override
@@ -118,7 +120,7 @@ public class ThidaHudEditor extends Screen {
                 : "")
             + "   "
             + ThidaMessages.text("hud.thida.editor.hint");
-    int hintWidth = Math.min(width - 16, minecraft.font.width(hint) + 16);
+    int hintWidth = Math.min(width - 16, ThidaGui.width(hint) + 16);
     ThidaGui.hudPanel(g, (width - hintWidth) / 2, height - 47, hintWidth, 16, ThidaGui.GOLD);
     ThidaGui.text(g, hint, (width - hintWidth) / 2 + 8, height - 43, hintWidth - 16, ThidaGui.TEXT);
     super.render(g, mouseX, mouseY, partial);

@@ -113,20 +113,20 @@ public final class ThidaBondHud {
             3,
             Math.min(
                 7, Long.toString(Math.max(1, (long) Math.ceil(n.getFloat("maxHp")))).length()));
-    return Minecraft.getInstance().font.width("8".repeat(digits) + " / " + "8".repeat(digits));
+    return ThidaGui.width("8".repeat(digits) + " / " + "8".repeat(digits));
   }
 
   private static int bondWidth(boolean preview) {
     var font = Minecraft.getInstance().font;
-    int wanted = font.width(ThidaMessages.text("ui.thida.bondhud.drawbonds.4")) + 14;
+    int wanted = ThidaGui.width(ThidaMessages.text("ui.thida.bondhud.drawbonds.4")) + 14;
     for (var row : displayedRows(preview)) {
-      int name = font.width(row.data().getString("name"));
+      int name = ThidaGui.width(row.data().getString("name"));
       int detail =
-          font.width(ThidaMessages.text("hud.thida.kind." + icon(row)))
+          ThidaGui.width(ThidaMessages.text("hud.thida.kind." + icon(row)))
               + 8
               + (row.data().getBoolean("available")
                   ? numberWidth(row.data())
-                  : font.width(row.data().getString("status")));
+                  : ThidaGui.width(row.data().getString("status")));
       wanted = Math.max(wanted, 54 + Math.max(name, detail));
     }
     return HudPacking.limit(
@@ -185,7 +185,7 @@ public final class ThidaBondHud {
                   java.util.Locale.ROOT, "%.0f / %.0f", n.getFloat("hp"), n.getFloat("maxHp"))
               : n.getString("status");
       if (!available && value.isBlank()) value = ThidaMessages.text("hud.thida.paused");
-      int valueWidth = Math.min(width - 56, available ? numberWidth(n) : mc.font.width(value));
+      int valueWidth = Math.min(width - 56, available ? numberWidth(n) : ThidaGui.width(value));
       ThidaGui.text(g, kind, 49, ry + 15, Math.max(0, width - 62 - valueWidth), ThidaGui.MUTED);
       ThidaGui.text(
           g,
@@ -236,7 +236,9 @@ public final class ThidaBondHud {
     var font = Minecraft.getInstance().font;
     for (var status : recipientStatuses(preview))
       widths.add(
-          26 + font.width(status.label()) + (status.ticks() > 0 ? font.width(" 888:88") : 0));
+          26
+              + ThidaGui.width(status.label())
+              + (status.ticks() > 0 ? ThidaGui.width(" 888:88") : 0));
     return HudPacking.grid(
         widths, ThidaHudLayout.available(ThidaHudConfig.RECIPIENT_SCALE.get(), 248), 5, 4, 23, 2);
   }
@@ -283,7 +285,7 @@ public final class ThidaBondHud {
       var s = statuses.get(i);
       var c = flow.cells().get(i);
       ThidaGui.icon(g, s.icon(), c.x() + 2, c.y() + 3, 1);
-      int timerWidth = s.ticks() > 0 ? Minecraft.getInstance().font.width("888:88") : 0;
+      int timerWidth = s.ticks() > 0 ? ThidaGui.width("888:88") : 0;
       ThidaGui.text(
           g,
           s.label(),

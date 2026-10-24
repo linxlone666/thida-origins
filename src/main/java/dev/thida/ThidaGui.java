@@ -2,9 +2,24 @@ package dev.thida;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.network.chat.Style;
+import net.minecraft.resources.ResourceLocation;
 
 /** Pixel frames and shared icon language for both the skill menu and the compact HUD. */
 public final class ThidaGui {
+  public static final ResourceLocation FONT = ResourceLocation.fromNamespaceAndPath("thida", "ui");
+  private static final Style FONT_STYLE = Style.EMPTY.withFont(FONT);
+
+  public static MutableComponent styled(Component text) {
+    return text.copy().withStyle(style -> style.withFont(FONT));
+  }
+
+  public static int width(String text) {
+    return Minecraft.getInstance().font.width(styled(Component.literal(text)));
+  }
+
   public static final int TEXT = 0xFFF5E8D2,
       MUTED = 0xFFC0AEC5,
       GOLD = 0xFFE2BC79,
@@ -49,10 +64,12 @@ public final class ThidaGui {
 
   public static void text(GuiGraphics g, String text, int x, int y, int maxWidth, int color) {
     var font = Minecraft.getInstance().font;
-    if (text == null || text.isBlank() || maxWidth < font.width("…")) return;
-    if (font.width(text) > maxWidth)
-      text = font.plainSubstrByWidth(text, Math.max(0, maxWidth - font.width("…"))) + "…";
-    g.drawString(font, text, x, y, color, false);
+    if (text == null || text.isBlank() || maxWidth < width("…")) return;
+    if (width(text) > maxWidth)
+      text =
+          font.getSplitter().plainHeadByWidth(text, Math.max(0, maxWidth - width("…")), FONT_STYLE)
+              + "…";
+    g.drawString(font, styled(Component.literal(text)), x, y, color, false);
   }
 
   public static long remaining(net.minecraft.nbt.CompoundTag data, String key) {
