@@ -1,51 +1,58 @@
-# Thida Origins — 0.8.1 developer handoff
+# Thida Origins
 
-Minecraft 1.21.1 / NeoForge 21.1.233 / Java 21 / Origins IAFEnvoy 0.4-beta.2
-งานรอบนี้ปรับโครงสร้าง จุดเชื่อมมานา/พลังเวทย์ และระบบภาพ Passive/Skill 1–3 โดยรักษา registry/NBT/กติกาเดิม
-ULT ยังไม่ตัดสินใจ งานชื่อเล่นเซิร์ฟเวอร์ยังพักไว้ ไม่มี AAA backend จริงใน JAR นี้
+Minecraft Origins mod. Current recovered source: **0.8.9-neoforge-dev** for **Minecraft 1.21.1, NeoForge 21.1.233, Java 21**.
 
-## เริ่มพัฒนาต่อ
+ม็อด Origin ธิดา — ซอร์สปัจจุบัน 0.8.9 พร้อมเอกสารภาษาไทยและประวัติรุ่นที่กู้คืน
 
-- [โครงสร้างและข้อมูลเซฟ](docs/ARCHITECTURE_TH.md)
-- [เชื่อมมานา พลังเวทย์ และฮีล](docs/PERSONAL_MOD_INTEGRATION_TH.md)
-- [event, mapping, lifecycle, preview และการต่อ AAA](docs/SKILL_EFFECT_ADAPTER_TH.md)
-- [กติกา Passive/Skill ที่ยืนยัน](docs/SKILLS_V7_TH.md)
-- [กฎหุ่นย้ายช่องได้แต่ห้ามย้ายออก](docs/DOLL_INVENTORY_0_7_1_TH.md)
-- [การเปลี่ยนแปลงและผลตรวจรุ่น 0.8.1](docs/CHANGELOG_0_8_1_TH.md)
+## Downloads and history
 
-## Build / ตรวจ
+- [Latest archived JAR: 0.8.9](archive/versions/0.8.9-neoforge-dev/thida-origins-1.21.1-neoforge-0.8.9-neoforge-dev.jar)
+- [Reconstructed history and version table](HISTORY.md)
+- [คำอธิบายประวัติภาษาไทย](HISTORY_TH.md)
+- [Original release artifacts, notes and checksums](archive/versions/)
 
-ติดตั้ง JDK 21 และตั้ง JAVA_HOME หรือวาง JDK ใน .tooling/java/ ไม่ต้องใช้ path ของเครื่องผู้สร้าง
+History covers 29 releases from 0.1.0 through 0.8.9, plus a saved Forge passive rewrite. Not every historical source snapshot survived. Tags beginning `archive/` identify binary-only milestones; they do not pretend that missing source code was recovered. Commit timestamps are import times. Imported commits are attributed to **linxlone666** with the GitHub noreply identity.
+
+## Build the current source
+
+Install a Java 21 JDK and set `JAVA_HOME`. Gradle downloads the dependencies declared in `build.gradle` on the first build.
+
+Windows:
 
 ```powershell
-.\tools\Build-NeoForge.ps1 -GameTests
-.\gradlew.bat formatJava
+.\gradlew.bat build
 ```
 
-หรือ `./gradlew test runGameTestServer jar` บนระบบอื่น
-การทดสอบ AFP เพิ่ม `-FakePlayerProfile <โฟลเดอร์โปรไฟล์>`; การทดสอบม็อดแพ็กเพิ่ม `-CompatProfile <โปรไฟล์> -AllProfileMods`
-GameTests/preview smoke classes อยู่ source set แยกและไม่รวมใน JAR เล่นจริง
-formatter เป็น dev-only task ไม่ใช่ runtime dependency
-รุ่นกำหนดที่ gradle.properties:mod_version แห่งเดียว และ expand เข้า metadata ตอน build
-JAR อยู่ build-neoforge/libs/; สร้างชุดซอร์สสะอาดด้วย tools/Package-Handoff.ps1 -OutputDirectory <โฟลเดอร์ใหม่>
+Linux/macOS:
 
-## Runtime
+```sh
+./gradlew build
+```
 
-ต้องมี Origins ของ IAFEnvoy รุ่นที่ระบุและ Jupiter/dependencies ของ Origins
-ไม่มีการเชื่อม Iron’s Spellbooks หรือ dependency ของระบบนั้น มานา Passive ต่อผ่าน provider ส่วนตัวเท่านั้น หากไม่มี provider จะข้ามเฉพาะการเติมมานา ไม่ต้องติดตั้ง AAA หากยังไม่ใช้ภาพจริง
-Origin อยู่ใน JAR แล้ว ไม่ต้องลง datapack ซ้ำ ใช้ client/server รุ่นเดียวกัน (network protocol 10-neoforge)
-อัปเกรดจาก 0.7.x ต้องเปลี่ยนทั้งสองฝั่ง ไม่มีการติดตั้งทับโปรไฟล์ DRC อัตโนมัติ
+Output: `build-neoforge/libs/`. Historical Forge tags require their original Minecraft/Forge/Java versions, rather than the current profile. No local caches, JDK installations, worlds or dependency JARs are included.
 
-เลข 1 เปิดเมนูลูกกลิ้ง/คลิกซ้าย คลิกขวาหรือ Esc ย้อนกลับ เลข 2 เรียกกาฝาก เลข 3 ใช้/ขอยกเลิกหทัย เปลี่ยนปุ่มได้
-OP ปลด Skill 2/3 แยกด้วย /thida unlock <ชื่อ> skill2 หรือ skill3
-ข้อความในเกมยังเป็นไทยทั้งสอง locale และมี fallback ภาษาไทยสำหรับ dedicated server
-Skill 1 ใช้ได้โดยไม่มี provider: บัฟ/ดีบัฟ 20%, เลือดไหล 2 HP/วินาที, ฮีล 20% ของ Max HP เป้าหมาย และร่ายฟรี ลดดาเมจหลังกาฝากแตก 20% ผู้พัฒนาม็อดเวทย์ยังติดตั้ง provider เพื่อแทนค่าทั้งชุดและกำหนดราคาต่อได้
+## Current controls
 
-กด H เพื่อจัด HUD แยกจากหน้าสกิล (เปลี่ยนปุ่มได้ใน Controls): คลิกแผงเพื่อเลือก ลากเพื่อย้าย หมุนลูกกลิ้งหรือกด −/+ เพื่อปรับขนาด 60–140% กดคืนค่าแผงนี้หรือเสร็จสิ้นเพื่อบันทึก แผงสายสัมพันธ์ ไอคอนสกิล และแถบผู้รับพันธะปรับแยกกันได้
-ถือหุ่นชนิดเดียวกด 1 จะเข้าคาถาทันที ถือหุ่นสองชนิดต่างกันสองมือจึงขึ้นหน้าเลือกหุ่น
+- `1`: doll/spell menu; mouse wheel selects, left click confirms, right click/Esc returns.
+- `2`: parasite doll action.
+- `3`: heart bond action.
+- `H`: separate HUD editor; drag panels and adjust their scale.
 
-## ขอบเขตชุดส่งมอบ
+Keys can be changed in Minecraft Controls. Keep client and server mod versions compatible. Spell and mana integrations are described in the existing project documents; this history import does not change gameplay behavior.
 
-รวม Gradle wrapper, source/resources/tests, scripts สำหรับ build/package และเอกสารปัจจุบัน
-ไม่รวม cache, build output, log, crash report, release เก่า หรือโลก/ข้อมูลผู้เล่นใน run directories
-เก็บสิ่งเหล่านั้นไว้ต้นทางและสำรองก่อนแก้ ไม่ลบโลกเพื่อให้ชุดส่งมอบสะอาด
+## Documentation
+
+- [Skill specifications (Thai)](docs/SKILLS_V7_TH.md)
+- [Personal magic/stat integration](docs/PERSONAL_MOD_INTEGRATION_TH.md)
+- [Effect adapter handoff](docs/SKILL_EFFECT_ADAPTER_TH.md)
+- [Embedded Itim font and license details](docs/FONT_0_8_5_TH.md)
+- [Font/HP and ThaiFontFix compatibility update](docs/FONT_HP_0_8_6_TH.md)
+- [Compact single-line menu footer](docs/MENU_0_8_9_TH.md)
+
+## Licensing
+
+Project license: [MIT](LICENSE). The bundled **Itim** font retains its separate **SIL OFL 1.1** license and copyright notices in [META-INF/licenses/Itim](src/main/resources/META-INF/licenses/Itim/). The restricted ThaiFontFix font pack is not included in this repository.
+
+## Continuing development
+
+Use this Git checkout for future work. Update `gradle.properties` when releasing a new version, commit the changes, then add and push a new annotated version tag. Keep existing tags and historical JAR checksums immutable. See `RECOVERED_SOURCE_STATUS.md` when inspecting an older archive-only tag.
