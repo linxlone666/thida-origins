@@ -21,7 +21,6 @@ import net.neoforged.neoforge.client.event.RenderGuiEvent;
 @EventBusSubscriber(modid = "thida", value = Dist.CLIENT)
 public final class ThidaBondHud {
   private static final Map<UUID, PlayerSkin> SKINS = new HashMap<>();
-  private static final int WIDTH = 208;
 
   private record Row(String kind, CompoundTag data) {}
 
@@ -86,129 +85,215 @@ public final class ThidaBondHud {
     drawRecipient(event.getGuiGraphics(), false);
   }
 
+  private static ArrayList<Row> displayedRows(boolean preview) {
+    if (!preview) return rows();
+    var result = new ArrayList<Row>();
+    String[] kinds = {"narotra_doll", "nilakan_doll", "parasite", "heart"};
+    for (int i = 0; i < kinds.length; i++) {
+      var n = new CompoundTag();
+      n.putString("id", Minecraft.getInstance().player.getUUID().toString());
+      n.putString("name", i == 0 ? "Mai" : "LongTargetName_ผู้เล่นชื่อยาวมาก");
+      n.putFloat("hp", i == 0 ? 18 : 1234);
+      n.putFloat("maxHp", i == 0 ? 20 : 9999);
+      n.putBoolean("available", i != 2);
+      n.putString("status", ThidaMessages.text("hud.thida.offline"));
+      result.add(new Row(kinds[i], n));
+    }
+    return result;
+  }
+
+  private static String icon(Row row) {
+    return row.kind().replace("_doll", "");
+  }
+
+  private static int numberWidth(CompoundTag n) {
+    // Reserve by maximum HP magnitude; changing current HP cannot resize the card.
+    int digits =
+        Math.max(
+            3,
+            Math.min(
+                7, Long.toString(Math.max(1, (long) Math.ceil(n.getFloat("maxHp")))).length()));
+    return Minecraft.getInstance().font.width("8".repeat(digits) + " / " + "8".repeat(digits));
+  }
+
+  private static int bondWidth(boolean preview) {
+    var font = Minecraft.getInstance().font;
+    int wanted = font.width(ThidaMessages.text("ui.thida.bondhud.drawbonds.4")) + 14;
+    for (var row : displayedRows(preview)) {
+      int name = font.width(row.data().getString("name"));
+      int detail =
+          font.width(ThidaMessages.text("hud.thida.kind." + icon(row)))
+              + 8
+              + (row.data().getBoolean("available")
+                  ? numberWidth(row.data())
+                  : font.width(row.data().getString("status")));
+      wanted = Math.max(wanted, 54 + Math.max(name, detail));
+    }
+    return HudPacking.limit(
+        wanted, 158, ThidaHudLayout.available(ThidaHudConfig.BOND_SCALE.get(), 224));
+  }
+
   static ThidaHudLayout.Bounds bondBounds(boolean preview) {
-    int count = preview ? Math.max(1, rows().size()) : rows().size();
-    return ThidaHudLayout.fit(x(), y(), WIDTH, 21 + count * 34, ThidaHudConfig.BOND_SCALE.get());
+    int height = 21 + displayedRows(preview).size() * 34;
+    var area =
+        ThidaHudLayout.fit(x(), y(), bondWidth(preview), height, ThidaHudConfig.BOND_SCALE.get());
+    if (!recipientStatuses(preview).isEmpty()) {
+      var recipient = recipientBounds(preview);
+      if (area.x() < recipient.x() + recipient.width()
+          && area.x() + area.width() > recipient.x()
+          && area.y() < recipient.y() + recipient.height()
+          && area.y() + area.height() > recipient.y()
+          && recipient.y() - area.y() > 60)
+        area =
+            ThidaHudLayout.fit(
+                area.x(),
+                area.y(),
+                bondWidth(preview),
+                height,
+                Math.min(area.scale(), (recipient.y() - area.y() - 6) / (double) height));
+    }
+    return area;
   }
 
   static void drawBonds(GuiGraphics g, boolean preview) {
     var mc = Minecraft.getInstance();
-    var rows = rows();
-    if (rows.isEmpty() && preview) {
-      var n = new CompoundTag();
-      n.putString("id", mc.player.getUUID().toString());
-      n.putString("name", ThidaMessages.text("ui.thida.bondhud.drawbonds.1"));
-      n.putFloat("hp", 100);
-      n.putFloat("maxHp", 100);
-      n.putBoolean("available", true);
-      n.putString("status", ThidaMessages.text("ui.thida.bondhud.drawbonds.2"));
-      rows.add(new Row("narotra_doll", n));
-    }
+    var rows = displayedRows(preview);
     if (rows.isEmpty()) return;
+    int width = bondWidth(preview);
     var area = bondBounds(preview);
     g.pose().pushPose();
     g.pose().translate(area.x(), area.y(), 0);
     g.pose().scale(area.scale(), area.scale(), 1);
-    int x = 0, y = 0, h = 21 + rows.size() * 34;
-    ThidaGui.hudPanel(g, x, y, WIDTH, h, 0xFF91DAC2);
+    ThidaGui.hudPanel(g, 0, 0, width, 21 + rows.size() * 34, 0xFF91DAC2);
     ThidaGui.text(
-        g,
-        ThidaMessages.text("ui.thida.bondhud.drawbonds.4"),
-        x + 7,
-        y + 6,
-        WIDTH - 14,
-        ThidaGui.TEXT);
+        g, ThidaMessages.text("ui.thida.bondhud.drawbonds.4"), 7, 6, width - 14, ThidaGui.TEXT);
     for (int i = 0; i < rows.size(); i++) {
       var row = rows.get(i);
       var n = row.data();
-      int ry = y + 19 + i * 34;
-      String icon =
-          row.kind().startsWith("narotra")
-              ? "narotra"
-              : row.kind().startsWith("nilakan") ? "nilakan" : row.kind();
-      ThidaGui.icon(g, icon, x + 5, ry + 5, 1);
+      int ry = 19 + i * 34;
+      ThidaGui.icon(g, icon(row), 5, ry + 7, 1);
       try {
-        PlayerFaceRenderer.draw(g, skin(UUID.fromString(n.getString("id"))), x + 25, ry + 2, 22);
+        PlayerFaceRenderer.draw(g, skin(UUID.fromString(n.getString("id"))), 25, ry + 4, 18);
       } catch (IllegalArgumentException ignored) {
       }
-      ThidaGui.text(g, n.getString("name"), x + 53, ry + 2, WIDTH - 61, ThidaGui.TEXT);
-      String hp =
-          String.format(
-              java.util.Locale.ROOT, "%.0f / %.0f", n.getFloat("hp"), n.getFloat("maxHp"));
-      String kind = ThidaMessages.text("hud.thida.kind." + icon);
+      ThidaGui.text(g, n.getString("name"), 49, ry + 2, width - 56, ThidaGui.TEXT);
+      String kind = ThidaMessages.text("hud.thida.kind." + icon(row));
+      boolean available = n.getBoolean("available");
+      String value =
+          available
+              ? String.format(
+                  java.util.Locale.ROOT, "%.0f / %.0f", n.getFloat("hp"), n.getFloat("maxHp"))
+              : n.getString("status");
+      if (!available && value.isBlank()) value = ThidaMessages.text("hud.thida.paused");
+      int valueWidth = Math.min(width - 56, available ? numberWidth(n) : mc.font.width(value));
+      ThidaGui.text(g, kind, 49, ry + 15, Math.max(0, width - 62 - valueWidth), ThidaGui.MUTED);
       ThidaGui.text(
           g,
-          kind + " · " + (n.getBoolean("available") ? hp : n.getString("status")),
-          x + 53,
+          value,
+          width - 7 - valueWidth,
           ry + 15,
-          WIDTH - 61,
-          n.getBoolean("available") ? 0xFF91DAC2 : ThidaGui.GOLD);
-      float health = n.getFloat("maxHp") > 0 ? n.getFloat("hp") / n.getFloat("maxHp") : 0;
-      ThidaGui.bar(
-          g,
-          x + 53,
-          ry + 28,
-          WIDTH - 61,
-          health,
-          n.getBoolean("available") ? 0xFF91DAC2 : ThidaGui.GOLD);
+          valueWidth,
+          available ? 0xFF91DAC2 : ThidaGui.GOLD);
+      if (available) {
+        float health = n.getFloat("maxHp") > 0 ? n.getFloat("hp") / n.getFloat("maxHp") : 0;
+        ThidaGui.bar(g, 49, ry + 28, Math.min(108, width - 56), health, 0xFF91DAC2);
+      } else {
+        // Never present cached offline HP as a current measurement.
+        ThidaGui.text(
+            g, ThidaMessages.text("hud.thida.hp_unknown"), 49, ry + 26, width - 56, ThidaGui.MUTED);
+      }
     }
     g.pose().popPose();
   }
 
+  private record Status(String icon, String label, long ticks) {}
+
+  private static ArrayList<Status> recipientStatuses(boolean preview) {
+    var data = ThidaHudState.snapshot().getCompound("recipient");
+    var result = new ArrayList<Status>();
+    if (preview || data.getBoolean("active"))
+      result.add(
+          new Status(
+              "heart",
+              ThidaMessages.text(
+                  data.getBoolean("used") ? "hud.thida.save_used" : "hud.thida.save_ready"),
+              0));
+    String[] keys = {"ward", "speed", "invulnerable"};
+    String[] icons = {"cleanse", "speed", "shield"};
+    for (int i = 0; i < keys.length; i++) {
+      long ticks =
+          preview
+              ? new long[] {3600, 1000, 100}[i]
+              : ThidaHudState.remaining(data.getLong(keys[i]));
+      if (ticks > 0)
+        result.add(new Status(icons[i], ThidaMessages.text("hud.thida.status." + keys[i]), ticks));
+    }
+    return result;
+  }
+
+  private static HudPacking.Flow recipientFlow(boolean preview) {
+    var widths = new ArrayList<Integer>();
+    var font = Minecraft.getInstance().font;
+    for (var status : recipientStatuses(preview))
+      widths.add(
+          26 + font.width(status.label()) + (status.ticks() > 0 ? font.width(" 888:88") : 0));
+    boolean shortScreen = Minecraft.getInstance().getWindow().getGuiScaledHeight() <= 280;
+    return HudPacking.flow(
+        widths,
+        shortScreen
+            ? ThidaHudLayout.available(.6, 512)
+            : ThidaHudLayout.available(ThidaHudConfig.RECIPIENT_SCALE.get(), 248),
+        5,
+        4,
+        23,
+        4);
+  }
+
   static ThidaHudLayout.Bounds recipientBounds() {
+    return recipientBounds(Minecraft.getInstance().screen instanceof ThidaHudEditor);
+  }
+
+  private static ThidaHudLayout.Bounds recipientBounds(boolean preview) {
     var window = Minecraft.getInstance().getWindow();
-    int width = Math.min(286, window.getGuiScaledWidth() - 12);
+    var flow = recipientFlow(preview);
     double scale = ThidaHudConfig.RECIPIENT_SCALE.get();
-    int x =
-        (window.getGuiScaledWidth() - (int) Math.ceil(width * scale)) / 2
-            + ThidaHudConfig.RECIPIENT_X.get();
+    int bottom =
+        Math.min(
+            window.getGuiScaledHeight() - 74,
+            window.getGuiScaledHeight() + ThidaHudConfig.RECIPIENT_Y.get());
+    int topLimit = window.getGuiScaledHeight() / 2 + 14;
+    // At very small GUI sizes, fit between crosshair and the vanilla bars.
+    // Higher custom positions use the lane above the crosshair instead.
+    if (bottom > topLimit)
+      scale = Math.min(scale, (bottom - topLimit) / (double) Math.max(1, flow.height()));
+    else scale = Math.min(scale, Math.max(1, bottom - 4) / (double) Math.max(1, flow.height()));
+    scale = Math.min(scale, (window.getGuiScaledWidth() - 12) / (double) Math.max(1, flow.width()));
+    int width = (int) Math.ceil(flow.width() * scale);
+    int height = (int) Math.ceil(flow.height() * scale);
     return ThidaHudLayout.fit(
-        x, window.getGuiScaledHeight() + ThidaHudConfig.RECIPIENT_Y.get(), width, 34, scale);
+        (window.getGuiScaledWidth() - width) / 2 + ThidaHudConfig.RECIPIENT_X.get(),
+        bottom - height,
+        Math.max(1, flow.width()),
+        Math.max(1, flow.height()),
+        scale);
   }
 
   static void drawRecipient(GuiGraphics g, boolean preview) {
-    var mc = Minecraft.getInstance();
-    var data = ThidaHudState.snapshot().getCompound("recipient");
-    if (preview) {
-      data = new CompoundTag();
-      data.putBoolean("active", true);
-      data.putLong("ward", 3600);
-      data.putLong("speed", 1000);
-    }
-    long ward = preview ? 3600 : ThidaHudState.remaining(data.getLong("ward")),
-        speed = preview ? 1000 : ThidaHudState.remaining(data.getLong("speed"));
-    long immune = ThidaHudState.remaining(data.getLong("invulnerable"));
-    if (!data.getBoolean("active") && ward == 0 && speed == 0 && immune == 0) return;
-    var area = recipientBounds();
+    var statuses = recipientStatuses(preview);
+    if (statuses.isEmpty()) return;
+    var flow = recipientFlow(preview);
+    var area = recipientBounds(preview);
     g.pose().pushPose();
     g.pose().translate(area.x(), area.y(), 0);
     g.pose().scale(area.scale(), area.scale(), 1);
-    int w = Math.min(286, mc.getWindow().getGuiScaledWidth() - 12), h = 34;
-    int x = 0, y = 0;
-    ThidaGui.hudPanel(g, x, y, w, h, ThidaGui.GOLD);
-    String status =
-        preview
-            ? ThidaMessages.text("ui.thida.bondhud.drawrecipient.1")
-            : data.getBoolean("active")
-                ? ThidaMessages.text("ui.thida.bondhud.drawrecipient.2")
-                    + (data.getBoolean("used")
-                        ? ThidaMessages.text("ui.thida.bondhud.drawrecipient.3")
-                        : ThidaMessages.text("ui.thida.bondhud.drawrecipient.4"))
-                : ThidaMessages.text("ui.thida.bondhud.drawrecipient.5");
-    ThidaGui.text(g, status, x + 7, y + 5, w - 14, ThidaGui.TEXT);
-    var parts = new ArrayList<String>();
-    if (ward > 0)
-      parts.add(ThidaMessages.text("ui.thida.bondhud.drawrecipient.6") + ThidaHudState.time(ward));
-    if (speed > 0)
-      parts.add(ThidaMessages.text("ui.thida.bondhud.drawrecipient.7") + ThidaHudState.time(speed));
-    if (immune > 0)
-      parts.add(
-          ThidaMessages.text("ui.thida.bondhud.drawrecipient.8") + ThidaHudState.time(immune));
-    String timers =
-        parts.isEmpty()
-            ? ThidaMessages.text("ui.thida.bondhud.drawrecipient.9")
-            : String.join(" • ", parts);
-    ThidaGui.text(g, timers, x + 7, y + 19, w - 14, ThidaGui.GOLD);
+    ThidaGui.hudPanel(g, 0, 0, flow.width(), flow.height(), ThidaGui.GOLD);
+    for (int i = 0; i < statuses.size(); i++) {
+      var s = statuses.get(i);
+      var c = flow.cells().get(i);
+      ThidaGui.icon(g, s.icon(), c.x() + 2, c.y() + 3, 1);
+      String value = s.label() + (s.ticks() > 0 ? " " + ThidaHudState.time(s.ticks()) : "");
+      ThidaGui.text(g, value, c.x() + 22, c.y() + 7, c.width() - 24, ThidaGui.TEXT);
+    }
     g.pose().popPose();
   }
 

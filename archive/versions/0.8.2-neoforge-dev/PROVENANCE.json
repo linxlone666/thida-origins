@@ -1,0 +1,13 @@
+{
+  "version": "0.8.2-neoforge-dev",
+  "tag": "v0.8.2-neoforge-dev",
+  "reconstructed_history": true,
+  "source_snapshot_available": true,
+  "checked_out_source_snapshot": "0.8.2-neoforge-dev",
+  "source_snapshot_label": "source",
+  "source_archive_sha256": null,
+  "artifact": "thida-origins-1.21.1-neoforge-0.8.2-neoforge-dev.jar",
+  "artifact_sha256": "c0cd953d5e153b46e8b870e764bdb7cec97fbb31dee312f4d903e555bb79115e",
+  "summary": "Make HUD sizing responsive to content and screen size",
+  "note": "Recovered source snapshot, not an original historical Git commit. Source and binary were not rebuilt to claim reproducible correspondence."
+}

@@ -49,6 +49,7 @@ public final class ThidaGui {
 
   public static void text(GuiGraphics g, String text, int x, int y, int maxWidth, int color) {
     var font = Minecraft.getInstance().font;
+    if (text == null || text.isBlank() || maxWidth < font.width("…")) return;
     if (font.width(text) > maxWidth)
       text = font.plainSubstrByWidth(text, Math.max(0, maxWidth - font.width("…"))) + "…";
     g.drawString(font, text, x, y, color, false);

@@ -98,14 +98,25 @@ public class ThidaHudEditor extends Screen {
     ThidaHud.draw(g, true);
     ThidaBondHud.drawRecipient(g, true);
     var area = bounds(selected);
-    g.renderOutline(area.x() - 2, area.y() - 2, area.width() + 4, area.height() + 4, ThidaGui.GOLD);
+    if (selected == Panel.EFFECTS) ThidaHud.previewOutline(g);
+    else
+      g.renderOutline(
+          area.x() - 2, area.y() - 2, area.width() + 4, area.height() + 4, ThidaGui.GOLD);
     String panel =
         ThidaMessages.text("hud.thida.panel." + selected.name().toLowerCase(java.util.Locale.ROOT));
     String hint =
         panel
             + " · "
             + Math.round(scale().get() * 100)
-            + "% · "
+            + "%"
+            + (area.scale() + .01 < scale().get()
+                ? " ("
+                    + ThidaMessages.text("hud.thida.fitted")
+                    + " "
+                    + Math.round(area.scale() * 100)
+                    + "%)"
+                : "")
+            + " · "
             + ThidaMessages.text("hud.thida.editor.hint");
     int hintWidth = Math.min(width - 16, minecraft.font.width(hint) + 16);
     ThidaGui.hudPanel(g, (width - hintWidth) / 2, height - 47, hintWidth, 16, ThidaGui.GOLD);
@@ -123,7 +134,7 @@ public class ThidaHudEditor extends Screen {
     if (button == 0) {
       for (Panel panel : new Panel[] {Panel.RECIPIENT, Panel.EFFECTS, Panel.BONDS}) {
         var area = bounds(panel);
-        if (area.contains(mx, my)) {
+        if (panel == Panel.EFFECTS ? ThidaHud.previewContains(mx, my) : area.contains(mx, my)) {
           selected = panel;
           dragging = true;
           offsetX = mx - area.x();
@@ -158,7 +169,7 @@ public class ThidaHudEditor extends Screen {
       }
       case RECIPIENT -> {
         ThidaHudConfig.RECIPIENT_X.set(x - (width - area.width()) / 2);
-        ThidaHudConfig.RECIPIENT_Y.set(y - height);
+        ThidaHudConfig.RECIPIENT_Y.set(y + area.height() - height);
       }
     }
     return true;
