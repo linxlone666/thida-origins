@@ -1,0 +1,64 @@
+plugins {
+    id 'java'
+    id 'net.minecraftforge.gradle' version '6.0.54'
+    id 'org.spongepowered.mixin' version '0.7.38'
+}
+
+group = 'dev.thida'
+version = '0.1.0'
+base.archivesName = 'thida-origins-1.20.1'
+java.toolchain.languageVersion = JavaLanguageVersion.of(17)
+
+sourceSets {
+    gametest {
+        compileClasspath += sourceSets.main.output
+        runtimeClasspath += sourceSets.main.output
+    }
+}
+configurations {
+    gametestImplementation.extendsFrom implementation
+    gametestRuntimeOnly.extendsFrom runtimeOnly
+}
+
+minecraft {
+    mappings channel: 'official', version: '1.20.1'
+    runs {
+        configureEach {
+            workingDirectory project.file('run')
+            property 'forge.logging.console.level', 'info'
+            mods { thida { source sourceSets.main } }
+        }
+        client { }
+        server { args '--nogui' }
+        gameTestServer {
+            property 'forge.enabledGameTestNamespaces', 'thida'
+            mods { thida { source sourceSets.gametest } }
+        }
+    }
+}
+
+repositories {
+    mavenCentral()
+    maven { url = 'https://repo.spongepowered.org/repository/maven-public/' }
+    maven { url = 'https://www.cursemaven.com'; content { includeGroup 'curse.maven' } }
+}
+dependencies {
+    minecraft 'net.minecraftforge:forge:1.20.1-47.4.0'
+    runtimeOnly fg.deobf('curse.maven:origins-forge-474438:5314209')
+    runtimeOnly fg.deobf('curse.maven:caelus-308989:5281700')
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
+    annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
+}
+mixin {
+    add sourceSets.main, 'thida.refmap.json'
+    config 'thida.mixins.json'
+}
+tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8' }
+test { useJUnitPlatform() }
+jar.finalizedBy('reobfJar')
+
+tasks.register('originDatapack', Zip) {
+    archiveFileName = 'thida-origin-1.20.1.zip'
+    destinationDirectory = layout.buildDirectory.dir('distributions')
+    from('src/main/resources') { include 'pack.mcmeta'; include 'data/**' }
+}

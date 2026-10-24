@@ -1,0 +1,19 @@
+{
+  "ingredients": [
+    {
+      "item": "minecraft:slime_ball"
+    },
+    {
+      "item": "minecraft:wheat_seeds"
+    },
+    {
+      "item": "minecraft:ghast_tear"
+    }
+  ],
+  "category": "equipment",
+  "type": "minecraft:crafting_shapeless",
+  "result": {
+    "count": 1,
+    "item": "thida:herbal_orb"
+  }
+}

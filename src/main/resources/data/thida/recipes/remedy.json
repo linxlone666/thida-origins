@@ -1,0 +1,19 @@
+{
+  "ingredients": [
+    {
+      "item": "minecraft:glass_bottle"
+    },
+    {
+      "item": "minecraft:glistering_melon_slice"
+    },
+    {
+      "item": "minecraft:sugar"
+    }
+  ],
+  "category": "equipment",
+  "type": "minecraft:crafting_shapeless",
+  "result": {
+    "count": 1,
+    "item": "thida:remedy"
+  }
+}

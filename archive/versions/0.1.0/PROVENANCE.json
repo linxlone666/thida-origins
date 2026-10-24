@@ -1,0 +1,13 @@
+{
+  "version": "0.1.0",
+  "tag": "v0.1.0",
+  "reconstructed_history": true,
+  "source_snapshot_available": true,
+  "checked_out_source_snapshot": "0.1.0",
+  "source_snapshot_label": "thida-0.1.0-source.zip",
+  "source_archive_sha256": "41ed69ac873d3db8da3f475cedd5092b655eb637c13add9e56fbfc7d7ac122cc",
+  "artifact": "thida-origins-1.20.1-0.1.0.jar",
+  "artifact_sha256": "d66f51e1abde8b7094b88d0528cc02c9491f99fa7abac523245382f164ebf90d",
+  "summary": "Recover initial Forge 1.20.1 source and release",
+  "note": "Recovered source snapshot, not an original historical Git commit. Source and binary were not rebuilt to claim reproducible correspondence."
+}

@@ -1,0 +1,6 @@
+{
+  "textures": {
+    "layer0": "minecraft:item/spider_eye"
+  },
+  "parent": "minecraft:item/generated"
+}

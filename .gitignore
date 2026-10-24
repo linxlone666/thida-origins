@@ -1,0 +1,16 @@
+.gradle/
+.gradle-cache/
+.tooling/
+build/
+run/
+forge-mdk.zip
+*.log
+.idea/
+*.iml
+build-neoforge/
+run*/
+release/
+crash-reports/
+*.zip
+*.hprof
+.vscode/

@@ -1,0 +1,6 @@
+{
+  "textures": {
+    "layer0": "minecraft:item/phantom_membrane"
+  },
+  "parent": "minecraft:item/generated"
+}

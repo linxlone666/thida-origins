@@ -1,0 +1,19 @@
+{
+  "ingredients": [
+    {
+      "item": "minecraft:wheat"
+    },
+    {
+      "item": "minecraft:string"
+    },
+    {
+      "item": "minecraft:gold_nugget"
+    }
+  ],
+  "category": "equipment",
+  "type": "minecraft:crafting_shapeless",
+  "result": {
+    "count": 1,
+    "item": "thida:narotra_doll"
+  }
+}

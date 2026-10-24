@@ -1,0 +1,19 @@
+{
+  "ingredients": [
+    {
+      "item": "minecraft:paper"
+    },
+    {
+      "item": "minecraft:gold_ingot"
+    },
+    {
+      "item": "minecraft:amethyst_shard"
+    }
+  ],
+  "category": "equipment",
+  "type": "minecraft:crafting_shapeless",
+  "result": {
+    "count": 1,
+    "item": "thida:ward"
+  }
+}

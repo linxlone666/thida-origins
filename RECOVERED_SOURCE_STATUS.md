@@ -1,0 +1,9 @@
+# Recovered source status
+
+Checked-out source snapshot: **0.1.0**.
+
+Latest archived milestone: **0.1.0**.
+
+Recovered source snapshot, not an original historical Git commit. Source and binary were not rebuilt to claim reproducible correspondence.
+
+History was reconstructed from saved files. Commit timestamps are import times; they are not original development timestamps.
