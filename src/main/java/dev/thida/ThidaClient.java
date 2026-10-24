@@ -308,13 +308,7 @@ public final class ThidaClient {
                 wanted, Math.max(ThidaGui.width(row.title()) + 48, ThidaGui.width(status) + 57));
       }
       int w = HudPacking.limit(((wanted + 7) / 8) * 8, 180, Math.min(272, width - 16));
-      var hints =
-          minecraft.font.split(
-              ThidaGui.styled(Component.literal(ThidaMessages.text("ui.thida.client.render.2"))),
-              w - 20);
-      int h = 25 + rows.size() * 35 + 14 + hints.size() * 12,
-          x = (width - w) / 2,
-          y = Math.max(8, (height - h) / 2);
+      int h = 51 + rows.size() * 35, x = (width - w) / 2, y = Math.max(8, (height - h) / 2);
       ThidaGui.frame(g, x, y, w, h, 0xFF91DAC2, true);
       ThidaGui.text(g, title.getString(), x + 10, y + 8, w - 20, ThidaGui.TEXT);
       for (int i = 0; i < rows.size(); i++) {
@@ -335,14 +329,13 @@ public final class ThidaClient {
         ThidaGui.text(
             g, status, x + 43, ry + 19, w - 57, reason.isEmpty() ? ThidaGui.MUTED : ThidaGui.GOLD);
       }
-      for (int i = 0; i < hints.size(); i++)
-        g.drawString(
-            minecraft.font,
-            hints.get(i),
-            x + 10,
-            y + 25 + rows.size() * 35 + 6 + i * 12,
-            ThidaGui.MUTED,
-            false);
+      ThidaGui.fittedText(
+          g,
+          ThidaMessages.text("ui.thida.client.render.2"),
+          x + 10,
+          y + 25 + rows.size() * 35 + 6,
+          w - 20,
+          ThidaGui.MUTED);
     }
   }
 

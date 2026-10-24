@@ -125,7 +125,7 @@
   "ui.thida.client.reason.1": "ยังไม่มีสายสัมพันธ์",
   "ui.thida.client.reason.2": "ต้องเลือกเผ่ากำเนิดธิดา",
   "ui.thida.client.render.1": "คลิกซ้ายที่ใดก็ได้เพื่อเลือก",
-  "ui.thida.client.render.2": "ลูกกลิ้ง: เลื่อน  •  คลิกขวา / Esc: ย้อนกลับ",
+  "ui.thida.client.render.2": "ลูกกลิ้ง: เลือก / คลิกขวา/Esc: กลับ",
   "ui.thida.client.tooltip.1": "เชื่อมกับ: ",
   "ui.thida.debug.reset.1": "รีเซ็ตคูลดาวน์ ",
   "ui.thida.debug.reset.2": " แล้ว (",

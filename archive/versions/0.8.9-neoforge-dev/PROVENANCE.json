@@ -1,0 +1,13 @@
+{
+  "version": "0.8.9-neoforge-dev",
+  "tag": "v0.8.9-neoforge-dev",
+  "reconstructed_history": true,
+  "source_snapshot_available": true,
+  "checked_out_source_snapshot": "0.8.9-neoforge-dev",
+  "source_snapshot_label": "source",
+  "source_archive_sha256": null,
+  "artifact": "thida-origins-1.21.1-neoforge-0.8.9-neoforge-dev.jar",
+  "artifact_sha256": "485b8463b4b6ba299d5a877a452df4347aed3761f61dfbc532045c756538414f",
+  "summary": "Keep the compact spell menu footer on one line",
+  "note": "Recovered source snapshot, not an original historical Git commit. Source and binary were not rebuilt to claim reproducible correspondence."
+}
