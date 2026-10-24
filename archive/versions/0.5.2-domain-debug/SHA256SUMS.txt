@@ -1,0 +1,1 @@
+c8133b1bc0b0e36cc4c05a6d12d5ce7cabe2f86204a995256a0fb3c038bca09b  thida-origins-1.20.1-0.5.2-domain-debug.jar
