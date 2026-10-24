@@ -1,0 +1,13 @@
+{
+  "version": "0.8.7-neoforge-dev",
+  "tag": "v0.8.7-neoforge-dev",
+  "reconstructed_history": true,
+  "source_snapshot_available": true,
+  "checked_out_source_snapshot": "0.8.7-neoforge-dev",
+  "source_snapshot_label": "source",
+  "source_archive_sha256": null,
+  "artifact": "thida-origins-1.21.1-neoforge-0.8.7-neoforge-dev.jar",
+  "artifact_sha256": "45bb1e536086a6abc1fed9b873bc8a6cb41c7b2b536e414d0f8e4c34ba2fbc50",
+  "summary": "Remove background from recipient statuses above the hotbar",
+  "note": "Recovered source snapshot, not an original historical Git commit. Source and binary were not rebuilt to claim reproducible correspondence."
+}

@@ -283,7 +283,6 @@ public final class ThidaBondHud {
     g.pose().pushPose();
     g.pose().translate(area.x(), area.y(), 0);
     g.pose().scale(area.scale(), area.scale(), 1);
-    ThidaGui.hudPanel(g, 0, 0, flow.width(), flow.height(), ThidaGui.GOLD);
     for (int i = 0; i < statuses.size(); i++) {
       var s = statuses.get(i);
       var c = flow.cells().get(i);
