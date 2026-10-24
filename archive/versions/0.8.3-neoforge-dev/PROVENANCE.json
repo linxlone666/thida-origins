@@ -1,0 +1,13 @@
+{
+  "version": "0.8.3-neoforge-dev",
+  "tag": "v0.8.3-neoforge-dev",
+  "reconstructed_history": true,
+  "source_snapshot_available": true,
+  "checked_out_source_snapshot": "0.8.3-neoforge-dev",
+  "source_snapshot_label": "source",
+  "source_archive_sha256": null,
+  "artifact": "thida-origins-1.21.1-neoforge-0.8.3-neoforge-dev.jar",
+  "artifact_sha256": "f5118822a2b7b101a583d36818bb7877e81512285be7eff8701a4bd188eb6280",
+  "summary": "Restore icon-only skill cards and align recipient status grid",
+  "note": "Recovered source snapshot, not an original historical Git commit. Source and binary were not rebuilt to claim reproducible correspondence."
+}

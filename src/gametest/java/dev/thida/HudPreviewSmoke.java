@@ -131,7 +131,7 @@ public final class HudPreviewSmoke {
           persistence(mc, true);
           LogUtils.getLogger()
               .info("THIDA_HUD_PREVIEW_PASS: samples, GUI2/3, HUD60/100/140, resize, drag, reopen");
-          next = now + 45_000_000_000L;
+          next = now + 2_000_000_000L;
         }
         case 15 -> {
           capture(mc, "after-manual.png");
@@ -210,7 +210,7 @@ public final class HudPreviewSmoke {
   }
 
   private static void persistence(Minecraft mc, boolean save) {
-    var path = mc.gameDirectory.toPath().resolve("hud-persistence-v2.properties");
+    var path = mc.gameDirectory.toPath().resolve("hud-persistence-v3.properties");
     String actual =
         ThidaHudConfig.BOND_X.get()
             + ","

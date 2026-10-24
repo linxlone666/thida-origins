@@ -15,6 +15,7 @@ import net.neoforged.neoforge.client.event.RenderGuiEvent;
 
 @EventBusSubscriber(modid = "thida", value = Dist.CLIENT)
 public final class ThidaHud {
+  private static final int BADGE_HEIGHT = 35;
   private static final String[] LINKS = {"nilakan_doll", "narotra_doll", "parasite", "heart"};
   private static final String[] NAMES = {
     ThidaMessages.text("ui.thida.client.choices.2"),
@@ -187,8 +188,10 @@ public final class ThidaHud {
     var area = previewBounds();
     double x = (mouseX - area.x()) / area.scale(), y = (mouseY - area.y()) / area.scale();
     for (var cell : flow(sampleBadges()).cells())
-      if (x >= cell.x() && x < cell.x() + cell.width() && y >= cell.y() && y < cell.y() + 27)
-        return true;
+      if (x >= cell.x()
+          && x < cell.x() + cell.width()
+          && y >= cell.y()
+          && y < cell.y() + BADGE_HEIGHT) return true;
     return false;
   }
 
@@ -198,7 +201,7 @@ public final class ThidaHud {
     g.pose().translate(area.x(), area.y(), 0);
     g.pose().scale(area.scale(), area.scale(), 1);
     for (var cell : flow(sampleBadges()).cells())
-      g.renderOutline(cell.x(), cell.y(), cell.width(), 27, ThidaGui.GOLD);
+      g.renderOutline(cell.x(), cell.y(), cell.width(), BADGE_HEIGHT, ThidaGui.GOLD);
     g.pose().popPose();
   }
 
@@ -210,24 +213,16 @@ public final class ThidaHud {
     return result;
   }
 
-  private static String badgeLabel(Badge badge) {
-    return ThidaMessages.text(
-            "hud.thida.effect." + (badge.key().equals("!") ? "invulnerable" : badge.icon()))
-        + (badge.phase() == HudTimeline.Phase.COOLDOWN
-            ? " · " + ThidaMessages.text("hud.thida.wait")
-            : "");
-  }
-
   private static HudPacking.Flow flow(List<Badge> badges) {
     var font = Minecraft.getInstance().font;
     var widths = new ArrayList<Integer>();
-    for (var badge : badges) widths.add(40 + font.width(badgeLabel(badge)) + font.width("888:88"));
+    for (var badge : badges) widths.add(Math.max(34, font.width("888:88") + 6));
     return HudPacking.flow(
         widths,
         ThidaHudLayout.available(ThidaHudConfig.EFFECT_SCALE.get(), 248),
         0,
         4,
-        27,
+        BADGE_HEIGHT,
         ThidaHudConfig.ICONS_PER_ROW.get());
   }
 
@@ -362,21 +357,25 @@ public final class ThidaHud {
       int bx = cell.x(), by = cell.y(), width = cell.width();
       boolean active = badge.phase() == HudTimeline.Phase.ACTIVE;
       int color = active ? 0xFF91DAC2 : ThidaGui.GOLD;
-      ThidaGui.hudPanel(g, bx, by, width, 27, color);
-      ThidaGui.icon(g, badge.icon(), bx + 5, by + 4, 1);
-      if (!active) g.fill(bx + 5, by + 4, bx + 21, by + 20, 0x88211D2D);
+      ThidaGui.hudPanel(g, bx, by, width, BADGE_HEIGHT, color);
+      int iconX = bx + (width - 16) / 2;
+      ThidaGui.icon(g, badge.icon(), iconX, by + 3, 1);
+      if (!active) g.fill(iconX, by + 3, iconX + 16, by + 19, 0x88211D2D);
       String timer = badge.sustained() ? "∞" : ThidaHudState.time(badge.ticks());
-      int timerWidth = mc.font.width("888:88");
-      String label = badgeLabel(badge);
-      ThidaGui.text(g, label, bx + 26, by + 8, width - timerWidth - 34, color);
-      ThidaGui.text(g, timer, bx + width - timerWidth - 4, by + 8, timerWidth, color);
+      ThidaGui.text(
+          g,
+          timer,
+          bx + Math.max(2, (width - mc.font.width(timer)) / 2),
+          by + 22,
+          width - 4,
+          color);
       float progress =
           badge.sustained()
               ? 1
               : active
                   ? badge.ticks() / (float) Math.max(1, badge.total())
                   : ThidaGui.progress(badge.ticks(), badge.total());
-      ThidaGui.bar(g, bx + 26, by + 22, width - 31, progress, color);
+      ThidaGui.bar(g, bx + 3, by + 32, width - 6, progress, color);
     }
     g.pose().popPose();
   }

@@ -237,16 +237,8 @@ public final class ThidaBondHud {
     for (var status : recipientStatuses(preview))
       widths.add(
           26 + font.width(status.label()) + (status.ticks() > 0 ? font.width(" 888:88") : 0));
-    boolean shortScreen = Minecraft.getInstance().getWindow().getGuiScaledHeight() <= 280;
-    return HudPacking.flow(
-        widths,
-        shortScreen
-            ? ThidaHudLayout.available(.6, 512)
-            : ThidaHudLayout.available(ThidaHudConfig.RECIPIENT_SCALE.get(), 248),
-        5,
-        4,
-        23,
-        4);
+    return HudPacking.grid(
+        widths, ThidaHudLayout.available(ThidaHudConfig.RECIPIENT_SCALE.get(), 248), 5, 4, 23, 2);
   }
 
   static ThidaHudLayout.Bounds recipientBounds() {
@@ -291,8 +283,22 @@ public final class ThidaBondHud {
       var s = statuses.get(i);
       var c = flow.cells().get(i);
       ThidaGui.icon(g, s.icon(), c.x() + 2, c.y() + 3, 1);
-      String value = s.label() + (s.ticks() > 0 ? " " + ThidaHudState.time(s.ticks()) : "");
-      ThidaGui.text(g, value, c.x() + 22, c.y() + 7, c.width() - 24, ThidaGui.TEXT);
+      int timerWidth = s.ticks() > 0 ? Minecraft.getInstance().font.width("888:88") : 0;
+      ThidaGui.text(
+          g,
+          s.label(),
+          c.x() + 22,
+          c.y() + 7,
+          c.width() - 24 - (timerWidth > 0 ? timerWidth + 4 : 0),
+          ThidaGui.TEXT);
+      if (timerWidth > 0)
+        ThidaGui.text(
+            g,
+            ThidaHudState.time(s.ticks()),
+            c.x() + c.width() - timerWidth - 2,
+            c.y() + 7,
+            timerWidth,
+            ThidaGui.TEXT);
     }
     g.pose().popPose();
   }

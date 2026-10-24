@@ -106,7 +106,7 @@ public class ThidaHudEditor extends Screen {
         ThidaMessages.text("hud.thida.panel." + selected.name().toLowerCase(java.util.Locale.ROOT));
     String hint =
         panel
-            + " · "
+            + "   "
             + Math.round(scale().get() * 100)
             + "%"
             + (area.scale() + .01 < scale().get()
@@ -116,7 +116,7 @@ public class ThidaHudEditor extends Screen {
                     + Math.round(area.scale() * 100)
                     + "%)"
                 : "")
-            + " · "
+            + "   "
             + ThidaMessages.text("hud.thida.editor.hint");
     int hintWidth = Math.min(width - 16, minecraft.font.width(hint) + 16);
     ThidaGui.hudPanel(g, (width - hintWidth) / 2, height - 47, hintWidth, 16, ThidaGui.GOLD);

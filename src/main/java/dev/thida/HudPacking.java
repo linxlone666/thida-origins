@@ -40,5 +40,26 @@ final class HudPacking {
         List.copyOf(cells));
   }
 
+  static Flow grid(
+      List<Integer> widths, int maximum, int padding, int gap, int rowHeight, int columns) {
+    if (widths.isEmpty()) return new Flow(0, 0, List.of());
+    int cols = Math.max(1, Math.min(columns, widths.size()));
+    int wanted = widths.stream().mapToInt(Integer::intValue).max().orElse(1);
+    int cellWidth =
+        Math.max(1, Math.min(wanted, (maximum - padding * 2 - gap * (cols - 1)) / cols));
+    var cells = new ArrayList<Cell>();
+    for (int i = 0; i < widths.size(); i++)
+      cells.add(
+          new Cell(
+              padding + (i % cols) * (cellWidth + gap),
+              padding + (i / cols) * (rowHeight + gap),
+              cellWidth));
+    int rows = (widths.size() + cols - 1) / cols;
+    return new Flow(
+        padding * 2 + cols * cellWidth + (cols - 1) * gap,
+        padding * 2 + rows * rowHeight + (rows - 1) * gap,
+        List.copyOf(cells));
+  }
+
   private HudPacking() {}
 }

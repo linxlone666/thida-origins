@@ -7,6 +7,18 @@ import org.junit.jupiter.api.Test;
 
 class HudPackingTest {
   @Test
+  void gridKeepsColumnsAlignedAndShrinksWithContent() {
+    var grid = HudPacking.grid(List.of(80, 110, 100, 75), 248, 5, 4, 23, 2);
+    assertEquals(grid.cells().get(0).x(), grid.cells().get(2).x());
+    assertEquals(grid.cells().get(1).x(), grid.cells().get(3).x());
+    assertEquals(grid.cells().get(0).width(), grid.cells().get(3).width());
+    assertEquals(234, grid.width());
+    assertEquals(60, grid.height());
+    assertEquals(90, HudPacking.grid(List.of(80), 248, 5, 4, 23, 2).width());
+    assertEquals(0, HudPacking.grid(List.of(), 248, 5, 4, 23, 2).height());
+  }
+
+  @Test
   void scaledWidthLeavesScreenMargin() {
     for (double scale : new double[] {.6, .9, 1, 1.4})
       for (int screen : new int[] {160, 320, 427, 854})
