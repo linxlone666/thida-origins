@@ -1,0 +1,13 @@
+{
+  "version": "0.7.1-neoforge-dev",
+  "tag": "v0.7.1-neoforge-dev",
+  "reconstructed_history": true,
+  "source_snapshot_available": true,
+  "checked_out_source_snapshot": "0.7.1-neoforge-dev",
+  "source_snapshot_label": "thida-before-handoff-0.7.1-20261021.zip",
+  "source_archive_sha256": "624a813ba0c3c1707fea989282be7170954aba4ca8651618173060d141f78cd6",
+  "artifact": "thida-origins-1.21.1-neoforge-0.7.1-neoforge-dev.jar",
+  "artifact_sha256": "895db26261992c849ba76da9008fdda539c223d59fac50e224f79c1883516f4b",
+  "summary": "Recover Skills 1-3, integration hooks and locked doll inventory",
+  "note": "Recovered source snapshot, not an original historical Git commit. Source and binary were not rebuilt to claim reproducible correspondence."
+}

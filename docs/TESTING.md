@@ -1,4 +1,6 @@
-# Verification — 0.5.5-mirror-debug
+# Verification — 0.5.5-mirror-debug (เอกสารเก่า)
+
+> กติกาด้านล่างเป็นรุ่น Forge เก่า ไม่ใช่เกณฑ์ยอมรับของรุ่น 0.7 ปัจจุบัน ดู `SKILLS_V7_TH.md` และ `V7_VERIFICATION_TH.md`
 
 Target: Minecraft 1.20.1 / Forge 47.4.0 / Origins Forge 1.20.1-1.10.0.9 / Caelus 3.2.0 / Java 17.
 

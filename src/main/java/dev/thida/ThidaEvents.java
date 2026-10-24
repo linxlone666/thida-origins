@@ -39,8 +39,8 @@ import net.minecraft.core.registries.BuiltInRegistries;
  * Other bonds and cooldowns use their own lifecycle rules.
  * Bleed is one armor-bypassing HP/second; attack slowdown is a temporary attribute modifier.
  * Parasite uses thida:shared damage with resource-defined armor/effect bypass tags.
- * Vanilla healing events have no healer identity: ordinary healing is blocked for recipients;
- * only recognized external healing through addonHeal releases a covenant.
+ * v7 parasite/heart/healing rules live in ThidaBonds and ThidaHealing.
+ * Legacy domain effects are retained here.
  * Domain hit debuffs focus on PvP. Weakening reduces all player-sourced damage by 30%;
  * vanilla Weakness additionally penalizes melee. Recipient absorption may absorb shared damage.
  */
@@ -63,9 +63,14 @@ public final class ThidaEvents {
         for (String key : new ArrayList<>(n.getAllKeys())) if (key.startsWith("cd_")) {
             n.remove(key); count++;
         }
-        return count;
+        var data = ThidaBondData.get(p.server); var skill = data.player(p);
+        for (String key : new ArrayList<>(skill.getAllKeys()))
+            if (key.endsWith("Cooldown") || key.equals("passiveBlockedUntil") || key.startsWith("spellCd_")) { skill.remove(key); count++; }
+        data.setDirty(); return count;
     }
     public static void debugEndPowers(ServerPlayer p) {
+        ThidaBonds.endHeart(p.server, p.getUUID(), "DEBUG_END");
+        ThidaBonds.breakParasite(p.server, p.getUUID(), "DEBUG_END", false);
         CompoundTag n = state(p);
         for (String key : new String[]{"nilakan_doll", "narotra_doll", "heart", "parasite"})
             if (n.hasUUID(key) || key.equals("parasite") && n.getBoolean("parasiteArmed")) {
@@ -110,6 +115,7 @@ public final class ThidaEvents {
         e.clearFire();
     }
     private static ServerPlayer resolve(ServerPlayer owner, String key) {
+        if (key.equals("heart") || key.equals("parasite")) return null; // v7 bonds live in world SavedData.
         if (!isThida(owner) || !owner.isAlive() || owner.isSpectator()) return null;
         CompoundTag n = state(owner);
         if (!n.hasUUID(key)) return null;
@@ -182,6 +188,7 @@ public final class ThidaEvents {
         data.putLong("invulnerable", Math.max(0, n.getLong("invulnerable") - now(p)));
         data.put("cooldowns", cooldowns);
         data.put("activeEffects", activeEffects);
+        ThidaBonds.hud(p, data);
         return data;
     }
     private static long effectTicks(ServerPlayer p, net.minecraft.core.Holder<MobEffect> effect) {
@@ -226,9 +233,7 @@ public final class ThidaEvents {
     }
     /** Integration hook: external addon healing should use this to release covenants. */
     public static void addonHeal(ServerPlayer caster, ServerPlayer target, float amount) {
-        if (caster == target && heartOwner(caster) != null) return;
-        if (caster != target) clearHeartFor(target);
-        heal(target, amount);
+        ThidaHealing.apply(caster, target, amount, ThidaHealing.Kind.SKILL);
     }
     private static void clearHeartFor(ServerPlayer target) {
         for (ServerPlayer p : target.server.getPlayerList().getPlayers())
@@ -299,6 +304,10 @@ public final class ThidaEvents {
 
     public static InteractionResultHolder<ItemStack> use(ServerPlayer p, ItemStack stack, InteractionHand hand) {
         String item = id(stack);
+        if (item.equals("parasite_doll") || item.equals("heart_doll")) {
+            if (isThida(p)) tell(p, item.equals("parasite_doll") ? "ใช้ปุ่มเรียกหุ่นกาฝากในการตั้งค่าปุ่ม" : "ใช้ปุ่มพันธะหทัยในการตั้งค่าปุ่ม");
+            return InteractionResultHolder.fail(stack);
+        }
         if (!ThidaMod.ABILITIES.containsKey(item)) return InteractionResultHolder.pass(stack);
         if (!isThida(p) || !p.isAlive() || p.isSpectator()) return InteractionResultHolder.pass(stack);
         CompoundTag n = state(p);
@@ -364,6 +373,7 @@ public final class ThidaEvents {
         else { effect(p, MobEffects.MOVEMENT_SPEED, seconds(), 1); addonHeal(caster, p, ThidaConfig.HEAL_AMOUNT.get().floatValue()); }
     }
     private static void curse(ServerPlayer p, int mode) {
+        if (ThidaBonds.warded(p)) return;
         if (mode == 1) {
             state(p).putLong("bleed", now(p) + seconds());
             effect(p, MobEffects.BLINDNESS, seconds(), 0);
@@ -513,6 +523,7 @@ public final class ThidaEvents {
     @SubscribeEvent
     public static void tick(PlayerTickEvent.Post event) {
         if (!(event.getEntity() instanceof ServerPlayer p)) return;
+        if (isThida(p)) ThidaBonds.adoptPassives(p);
         CompoundTag n = state(p);
         long time = now(p);
         if (n.getLong("slow") <= time && p.getAttribute(Attributes.ATTACK_SPEED) != null)

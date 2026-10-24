@@ -10,7 +10,7 @@ plugins {
 }
 if (project.hasProperty('withConnector')) apply plugin: 'org.sinytra.adapter.userdev'
 group = 'dev.thida'
-version = '0.6.5-neoforge-dev'
+version = '0.7.1-neoforge-dev'
 base.archivesName = 'thida-origins-1.21.1-neoforge'
 layout.buildDirectory = layout.projectDirectory.dir('build-neoforge')
 java.toolchain.languageVersion = JavaLanguageVersion.of(21)
@@ -44,6 +44,13 @@ neoForge {
             systemProperty 'thida.worldJoinSmoke', 'true'
             gameDirectory = project.file('run-neoforge-world-join-smoke')
         }
+        uiSmoke {
+            client()
+            sourceSet = sourceSets.gametest
+            systemProperty 'thida.worldJoinSmoke', 'true'
+            systemProperty 'thida.uiSmoke', 'true'
+            gameDirectory = project.file('run-neoforge-world-join-smoke')
+        }
         server { server(); programArgument '--nogui' }
         gameTestServer {
             type = 'gameTestServer'
@@ -52,7 +59,7 @@ neoForge {
             gameDirectory = project.file('run-neoforge-gametest')
         }
         configureEach {
-            if (name != 'gameTestServer' && name != 'singleplayerSmoke' && name != 'worldJoinSmoke') gameDirectory = project.file('run-neoforge')
+            if (name != 'gameTestServer' && name != 'singleplayerSmoke' && name != 'worldJoinSmoke' && name != 'uiSmoke') gameDirectory = project.file('run-neoforge')
             logLevel = org.slf4j.event.Level.INFO
         }
     }

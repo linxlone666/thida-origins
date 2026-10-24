@@ -9,6 +9,18 @@ import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 
 public final class ThidaNetwork {
+    public record SkillAction(CompoundTag data) implements CustomPacketPayload {
+        public static final Type<SkillAction> TYPE = ThidaNetwork.type("skill_action");
+        public static final StreamCodec<RegistryFriendlyByteBuf, SkillAction> CODEC = StreamCodec.of(
+                (b, m) -> b.writeNbt(m.data()), b -> new SkillAction(b.readNbt()));
+        @Override public Type<SkillAction> type() { return TYPE; }
+    }
+    public record Confirmation(CompoundTag data) implements CustomPacketPayload {
+        public static final Type<Confirmation> TYPE = ThidaNetwork.type("confirmation");
+        public static final StreamCodec<RegistryFriendlyByteBuf, Confirmation> CODEC = StreamCodec.of(
+                (b, m) -> b.writeNbt(m.data()), b -> new Confirmation(b.readNbt()));
+        @Override public Type<Confirmation> type() { return TYPE; }
+    }
     private static <T extends CustomPacketPayload> CustomPacketPayload.Type<T> type(String name) {
         return new CustomPacketPayload.Type<>(ResourceLocation.fromNamespaceAndPath("thida", name));
     }
@@ -37,7 +49,12 @@ public final class ThidaNetwork {
         @Override public Type<PassiveEffectEvent> type() { return TYPE; }
     }
     public static void register(RegisterPayloadHandlersEvent event) {
-        var registrar = event.registrar("8-neoforge");
+        var registrar = event.registrar("9-neoforge");
+        registrar.playToServer(SkillAction.TYPE, SkillAction.CODEC, (message, context) -> context.enqueueWork(() -> {
+            if (context.player() instanceof ServerPlayer player && message.data() != null) ThidaBonds.request(player, message.data());
+        }));
+        registrar.playToClient(Confirmation.TYPE, Confirmation.CODEC,
+                (message, context) -> context.enqueueWork(() -> ThidaClientEffects.confirmation(message.data())));
         registrar.playToServer(DollAction.TYPE, DollAction.CODEC, (message, context) -> context.enqueueWork(() -> {
             if (context.player() instanceof ServerPlayer player) ThidaEvents.dollAction(player, message.button());
         }));

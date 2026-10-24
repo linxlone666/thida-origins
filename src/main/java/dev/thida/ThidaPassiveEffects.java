@@ -18,7 +18,7 @@ public final class ThidaPassiveEffects {
         packet.putString("passive", passive);
         packet.putUUID("owner", owner.getUUID());
         if (target != null) packet.putUUID("target", target.getUUID());
-        else {
+        else if (passive.equals("NAROTRA") || passive.equals("NILAKAN")) {
             String key = passive.equals("NAROTRA") ? "narotra_doll" : "nilakan_doll";
             if (ThidaEvents.state(owner).hasUUID(key)) packet.putUUID("target", ThidaEvents.state(owner).getUUID(key));
         }

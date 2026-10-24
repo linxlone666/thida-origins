@@ -70,6 +70,7 @@ public final class ThidaGameTests {
                 for (int i = 0; i <= 200; i++) ThidaPassives.tickAt(owner, state(owner), i);
                 h.assertTrue(state(owner).hasUUID("narotra_doll")
                         && state(owner).getUUID("narotra_doll").equals(target.getUUID()), "Narotra links AFP after gaze");
+                ThidaPassives.unlink(owner, "narotra_doll", "TEST");
                 owner.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(ThidaMod.ABILITIES.get("nilakan_doll").get()));
                 NeoForge.EVENT_BUS.post(new AttackEntityEvent(owner, target));
                 h.assertTrue(state(owner).hasUUID("nilakan_doll")
@@ -115,7 +116,7 @@ public final class ThidaGameTests {
             for (String id : ThidaMod.ABILITIES.keySet()) {
                 ItemStack stack = new ItemStack(ThidaMod.ABILITIES.get(id).get());
                 p.setItemInHand(InteractionHand.MAIN_HAND, stack);
-                h.assertTrue(stack.use(p.level(), p, InteractionHand.MAIN_HAND).getResult() == InteractionResult.PASS,
+                h.assertTrue(!stack.use(p.level(), p, InteractionHand.MAIN_HAND).getResult().consumesAction(),
                         "Non-origin must not activate " + id);
             }
             near(h, p.getHealth(), 40, "Non-origin must not heal");
@@ -147,9 +148,9 @@ public final class ThidaGameTests {
 
             target.setPos(owner.getX() + 201, owner.getY(), owner.getZ());
             tick(owner);
-            h.assertTrue(state(owner).hasUUID("nilakan_doll"), "Out of range pauses without deleting the bond");
-            near(h, owner.getAttributeValue(Attributes.MOVEMENT_SPEED), Attributes.MOVEMENT_SPEED.value().getDefaultValue(),
-                    "Paused Nilakan removes its movement bonus");
+            h.assertTrue(state(owner).hasUUID("nilakan_doll"), "Distance no longer deletes the bond");
+            near(h, owner.getAttributeValue(Attributes.MOVEMENT_SPEED), Attributes.MOVEMENT_SPEED.value().getDefaultValue() * 1.05,
+                    "Nilakan remains active beyond 200 blocks");
 
             target.setPos(owner.getX() + 5, owner.getY(), owner.getZ());
             tick(owner);
@@ -267,7 +268,8 @@ public final class ThidaGameTests {
             near(h, targetMana.getMana(), 40, "Narotra restores its target again at 20 seconds");
             anotherOwner.setPos(owner.getX(), owner.getY(), owner.getZ());
             completeNarotra(anotherOwner, target, 1400);
-            near(h, anotherMana.getMana(), 10, "A second Thida gets its own first restoration");
+            near(h, anotherMana.getMana(), 0, "An already reserved target cannot be linked again");
+            h.assertTrue(!state(anotherOwner).hasUUID("narotra_doll"), "Duplicate target reservation is rejected");
             near(h, targetMana.getMana(), 40, "Two Narotra sources do not stack the target's mana rate");
             ownerMana.setMana(249); targetMana.setMana(399);
             ThidaPassives.tickAt(owner, state(owner), 1800);
@@ -286,134 +288,6 @@ public final class ThidaGameTests {
         state(owner).putUUID("passive_gaze_item", token);
         state(owner).putInt("gaze", 199);
         ThidaPassives.tickAt(owner, state(owner), time);
-    }
-
-    @GameTest(template = "empty")
-    public static void covenantBlocksRecipientAttackAndHealing(GameTestHelper h) {
-        run(h, f -> {
-            FakePlayer owner = f.player(true), target = f.player(false), victim = f.player(false);
-            state(owner).putUUID("heart", target.getUUID());
-            target.setHealth(40);
-            LivingIncomingDamageEvent attack = incoming(victim, victim.damageSources().playerAttack(target), 4);
-            NeoForge.EVENT_BUS.post(attack);
-            h.assertTrue(attack.isCanceled(), "Covenant recipient's attack must be canceled on Forge bus");
-            target.heal(5);
-            near(h, target.getHealth(), 40, "Ordinary healing must be blocked");
-            ThidaEvents.addonHeal(target, target, 5);
-            near(h, target.getHealth(), 40, "Recipient's own addon healing must be blocked");
-            h.assertTrue(state(owner).hasUUID("heart"), "Self healing must retain covenant");
-        });
-    }
-
-    @GameTest(template = "empty")
-    public static void ownerDamageBreaksCovenantAndBleeds(GameTestHelper h) {
-        run(h, f -> {
-            FakePlayer owner = f.player(true), target = f.player(false);
-            state(owner).putUUID("heart", target.getUUID());
-            state(owner).putBoolean("heartUsed", true);
-            NeoForge.EVENT_BUS.post(damageEvent(owner, owner.damageSources().generic(), 4));
-            h.assertTrue(!state(owner).hasUUID("heart") && !state(owner).contains("heartUsed"), "Owner damage must clear covenant");
-            h.assertTrue(state(owner).getLong("bleed") > owner.level().getGameTime(), "Owner damage must start bleed");
-        });
-    }
-
-    @GameTest(template = "empty")
-    public static void externalAddonHealingReleasesCovenant(GameTestHelper h) {
-        run(h, f -> {
-            FakePlayer owner = f.player(true), target = f.player(false), healer = f.player(true);
-            state(owner).putUUID("heart", target.getUUID());
-            state(owner).putBoolean("heartUsed", true);
-            target.setHealth(40);
-            ThidaEvents.addonHeal(healer, target, 6);
-            near(h, target.getHealth(), 46, "External addon healing");
-            h.assertTrue(!state(owner).contains("heart") && !state(owner).contains("heartUsed"), "External heal must release covenant");
-            target.heal(2);
-            near(h, target.getHealth(), 48, "Ordinary healing must resume");
-        });
-    }
-
-    @GameTest(template = "empty")
-    public static void vanillaExternalInstantHealthReleasesCovenant(GameTestHelper h) {
-        run(h, f -> {
-            FakePlayer owner = f.player(true), recipient = f.player(false), caster = f.player(false);
-            state(owner).putUUID("heart", recipient.getUUID());
-            state(owner).putBoolean("heartUsed", true);
-            recipient.setHealth(40);
-            MobEffects.HEAL.value().applyInstantenousEffect(caster, caster, recipient, 0, 1.0);
-            near(h, recipient.getHealth(), 44, "External vanilla instant health");
-            h.assertTrue(!state(owner).contains("heart") && !state(owner).contains("heartUsed"), "External vanilla instant health must release covenant");
-        });
-    }
-
-    @GameTest(template = "empty")
-    public static void vanillaSelfInstantHealthKeepsCovenant(GameTestHelper h) {
-        run(h, f -> {
-            FakePlayer owner = f.player(true), recipient = f.player(false);
-            state(owner).putUUID("heart", recipient.getUUID());
-            recipient.setHealth(40);
-            MobEffects.HEAL.value().applyInstantenousEffect(recipient, recipient, recipient, 0, 1.0);
-            near(h, recipient.getHealth(), 40, "Self vanilla instant health must be blocked");
-            h.assertTrue(state(owner).hasUUID("heart"), "Self vanilla instant health must retain covenant");
-        });
-    }
-
-    @GameTest(template = "empty")
-    public static void vanillaExternalRegenerationReleasesCovenant(GameTestHelper h) {
-        run(h, f -> {
-            FakePlayer owner = f.player(true), recipient = f.player(false), caster = f.player(false);
-            state(owner).putUUID("heart", recipient.getUUID());
-            state(owner).putBoolean("heartUsed", true);
-            recipient.setHealth(40);
-            recipient.addEffect(new MobEffectInstance(MobEffects.REGENERATION, 200), caster);
-            MobEffects.REGENERATION.value().applyEffectTick(recipient, 0);
-            near(h, recipient.getHealth(), 41, "External vanilla regeneration tick");
-            h.assertTrue(!state(owner).contains("heart") && !state(owner).contains("heartUsed"), "External vanilla regeneration must release covenant");
-        });
-    }
-
-    @GameTest(template = "empty")
-    public static void vanillaSelfRegenerationKeepsCovenant(GameTestHelper h) {
-        run(h, f -> {
-            FakePlayer owner = f.player(true), recipient = f.player(false);
-            state(owner).putUUID("heart", recipient.getUUID());
-            recipient.setHealth(40);
-            recipient.addEffect(new MobEffectInstance(MobEffects.REGENERATION, 200), recipient);
-            MobEffects.REGENERATION.value().applyEffectTick(recipient, 0);
-            near(h, recipient.getHealth(), 40, "Self vanilla regeneration must be blocked");
-            h.assertTrue(state(owner).hasUUID("heart"), "Self vanilla regeneration must retain covenant");
-        });
-    }
-
-    @GameTest(template = "empty")
-    public static void parasiteConservesActualDamage(GameTestHelper h) {
-        run(h, f -> {
-            FakePlayer owner = f.player(true), partner = f.player(false);
-            state(owner).putUUID("parasite", partner.getUUID());
-            h.assertTrue(owner.hurt(owner.damageSources().generic(), 10), "Actual damage must be accepted");
-            double share = ThidaConfig.SHARE_FRACTION.get();
-            near(h, owner.getHealth(), 100 - 10 * (1 - share), "Owner damage share");
-            near(h, partner.getHealth(), 100 - 10 * share, "Partner damage share");
-            near(h, 200 - owner.getHealth() - partner.getHealth(), 10, "Total damage must be conserved");
-            owner.invulnerableTime = partner.invulnerableTime = 0;
-            h.assertTrue(partner.hurt(partner.damageSources().generic(), 6), "Reverse damage must be accepted");
-            near(h, 200 - owner.getHealth() - partner.getHealth(), 16, "Reverse damage must also be conserved");
-        });
-    }
-
-    @GameTest(template = "empty")
-    public static void parasiteSharedDamageUsesTotem(GameTestHelper h) {
-        run(h, f -> {
-            FakePlayer owner = f.player(true), partner = f.player(false);
-            h.assertTrue(ThidaConfig.SHARE_FRACTION.get() > 0, "Totem test requires nonzero parasite sharing");
-            partner.setHealth(1);
-            partner.setItemInHand(InteractionHand.OFF_HAND, new ItemStack(Items.TOTEM_OF_UNDYING));
-            state(owner).putUUID("parasite", partner.getUUID());
-            owner.hurt(owner.damageSources().generic(), (float) (2 / ThidaConfig.SHARE_FRACTION.get()));
-            h.assertTrue(partner.isAlive(), "Shared lethal damage must allow totem survival");
-            h.assertTrue(partner.getOffhandItem().isEmpty(), "Shared damage must consume the totem");
-            near(h, partner.getHealth(), 1, "Totem survival health");
-            h.assertTrue(partner.hasEffect(MobEffects.REGENERATION), "Vanilla totem effects must run");
-        });
     }
 
     @GameTest(template = "empty")
@@ -475,29 +349,8 @@ public final class ThidaGameTests {
                 server.getCommands().getDispatcher().execute("origin set " + p.getScoreboardName() + " origins:origin thida:thida", source);
                 int result = server.getCommands().getDispatcher().execute("thida kit", p.createCommandSourceStack().withSuppressedOutput());
                 h.assertTrue(result == 1, "Kit command must succeed");
-                ThidaMod.ABILITIES.forEach((id, item) -> h.assertTrue(p.getInventory().contains(new ItemStack(item.get())), "Kit missing " + id));
+                for (String id : new String[]{"narotra_doll", "nilakan_doll"}) h.assertTrue(p.getInventory().contains(new ItemStack(ThidaMod.ABILITIES.get(id).get())), "Kit missing " + id);
             } catch (Exception e) { throw new AssertionError("Kit command must execute", e); }
-        });
-    }
-
-    @GameTest(template = "empty")
-    public static void covenantSavesOnceAndExpires(GameTestHelper h) {
-        run(h, f -> {
-            FakePlayer owner = f.player(true), target = f.player(false);
-            state(owner).putUUID("heart", target.getUUID());
-            target.setHealth(10);
-            target.hurt(target.damageSources().generic(), 100);
-            near(h, target.getHealth(), 1, "Lethal damage must leave one HP");
-            h.assertTrue(state(owner).getBoolean("heartUsed"), "Covenant save must be consumed");
-            h.assertTrue(state(owner).hasUUID("heart"), "Saving must retain recipient restrictions");
-            near(h, state(target).getLong("invulnerable") - target.level().getGameTime(), 100, "Protection must last exactly five seconds");
-            target.invulnerableTime = 0;
-            target.hurt(target.damageSources().generic(), 100);
-            near(h, target.getHealth(), 1, "Protected damage must be canceled");
-            state(target).putLong("invulnerable", 0);
-            LivingDamageEvent.Pre after = damageEvent(target, target.damageSources().generic(), 2);
-            NeoForge.EVENT_BUS.post(after);
-            near(h, after.getNewDamage(), 2, "Consumed covenant cannot save a second time");
         });
     }
 
@@ -517,46 +370,11 @@ public final class ThidaGameTests {
             ItemStack narotra = new ItemStack(ThidaMod.ABILITIES.get("narotra_doll").get());
             UUID narotraItem = UUID.randomUUID(); ThidaItemData.putUUID(narotra, "thida_passive_instance", narotraItem);
             owner.getInventory().add(narotra);
-            state(owner).putUUID("narotra_doll", target.getUUID());
+            state(owner).putUUID("narotra_doll", f.player(false).getUUID());
             state(owner).putUUID("passive_narotra_item", narotraItem);
             NeoForge.EVENT_BUS.post(new PlayerTickEvent.Post(owner));
             h.assertTrue(state(owner).hasUUID("narotra_doll") && state(owner).hasUUID("nilakan_doll"), "Hand changes must preserve both marks");
             h.assertTrue(state(owner).getUUID("passive_nilakan_item").equals(nilakanItem), "Nilakan instance survives hand changes when stored in inventory");
-        });
-    }
-
-    @GameTest(template = "empty")
-    public static void parasiteRequiresSummonBeforeHit(GameTestHelper h) {
-        run(h, f -> {
-            FakePlayer owner = f.player(true), target = f.player(false);
-            owner.setHealth(20); target.setHealth(20);
-            owner.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(ThidaMod.ABILITIES.get("parasite_doll").get()));
-            target.hurt(target.damageSources().playerAttack(owner), 2);
-            h.assertTrue(!state(owner).hasUUID("parasite") && !state(owner).getBoolean("parasiteReward"), "Low combined HP must not create or reward parasite");
-            near(h, owner.getHealth(), 20, "Rejected parasite must not heal owner");
-            use(h, owner, "parasite_doll");
-            h.assertTrue(state(owner).getBoolean("parasiteArmed"), "Using skill summons and arms parasite");
-            target.invulnerableTime = 0;
-            target.hurt(target.damageSources().playerAttack(owner), 2);
-            h.assertTrue(state(owner).getBoolean("parasiteReward"), "Low caster health may break after shared damage");
-            h.assertTrue(state(owner).getLong("cd_parasite_doll") > owner.level().getGameTime(), "Break starts cooldown");
-        });
-    }
-
-    @GameTest(template = "empty")
-    public static void parasiteBreakRewardsOnlyOnce(GameTestHelper h) {
-        run(h, f -> {
-            FakePlayer owner = f.player(true), target = f.player(false);
-            owner.setHealth(30); target.setHealth(30);
-            state(owner).putUUID("parasite", target.getUUID());
-            owner.hurt(owner.damageSources().generic(), 12);
-            h.assertTrue(!state(owner).hasUUID("parasite"), "Bond breaks below 25 caster HP");
-            NeoForge.EVENT_BUS.post(new PlayerTickEvent.Post(owner));
-            near(h, owner.getHealth(), 74, "Owner must gain fifty HP after pending damage");
-            near(h, target.getHealth(), 24, "Partner keeps its damage share");
-            NeoForge.EVENT_BUS.post(new PlayerTickEvent.Post(owner));
-            near(h, owner.getHealth(), 74, "Reward cannot repeat next tick");
-            h.assertTrue(target.hasEffect(MobEffects.DAMAGE_RESISTANCE) && target.hasEffect(MobEffects.MOVEMENT_SPEED), "Partner receives escape buffs");
         });
     }
 
@@ -622,24 +440,6 @@ public final class ThidaGameTests {
             h.assertTrue(!owner.hasEffect(MobEffects.POISON), "Narotra cleanses Thida, not its linked target");
             h.assertTrue(target.hasEffect(MobEffects.POISON), "Narotra does not cleanse the target");
             near(h, target.getHealth(), 100, "Narotra does not heal the target");
-        });
-    }
-
-    @GameTest(template = "empty")
-    public static void covenantUnlimitedRangeAndDomainAllowed(GameTestHelper h) {
-        run(h, f -> {
-            FakePlayer owner = f.player(true), target = f.player(false);
-            state(owner).putUUID("heart", target.getUUID());
-            state(owner).putUUID("nilakan_doll", target.getUUID());
-            target.setPos(owner.getX() + 1000, owner.getY(), owner.getZ());
-            tick(owner);
-            h.assertTrue(state(owner).hasUUID("heart"), "Covenant must survive beyond old range");
-            use(h, owner, "domain_talisman");
-            owner.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(ThidaMod.ABILITIES.get("nilakan_doll").get()));
-            ThidaEvents.dollAction(owner, 1); ThidaEvents.dollAction(owner, 3);
-            h.assertTrue(!target.hasEffect(MobEffects.BLINDNESS), "Domain does not bypass covenant doll restriction");
-            ThidaEvents.addonHeal(owner, target, 1);
-            near(h, state(owner).getLong("cd_heart_doll") - owner.level().getGameTime(), 12000, "External heal starts covenant cooldown");
         });
     }
 
@@ -710,27 +510,6 @@ public final class ThidaGameTests {
     }
 
     @GameTest(template = "empty")
-    public static void hudSnapshotLinksCooldownsAndPrivacy(GameTestHelper h) {
-        run(h, f -> {
-            FakePlayer owner = f.player(true), target = f.player(false), other = f.player(true);
-            state(owner).putUUID("nilakan_doll", target.getUUID());
-            state(other).putUUID("heart", owner.getUUID());
-            state(owner).putString("privateInternalValue", "must-not-sync");
-            long time = owner.level().getGameTime();
-            state(owner).putLong("cd_domain_talisman", time + 600);
-            state(owner).putLong("cd_heart_doll", time - 20);
-            var data = ThidaEvents.hudSnapshot(owner);
-            h.assertTrue(data.getCompound("nilakan_doll").getString("name").equals(target.getScoreboardName()), "HUD resolves linked target name");
-            near(h, data.getCompound("cooldowns").getLong("cd_domain_talisman"), 600, "HUD sends remaining active cooldown ticks");
-            near(h, data.getCompound("cooldowns").getLong("cd_heart_doll"), 0, "Expired cooldown is clamped");
-            h.assertTrue(data.getString("guardian").equals(other.getScoreboardName()), "Recipient sees their guardian");
-            h.assertTrue(!data.contains("privateInternalValue") && !data.getCompound("heart").hasUUID("heart"), "Internal state is not copied wholesale");
-            var recipient = ThidaEvents.hudSnapshot(target);
-            h.assertTrue(!recipient.getBoolean("thida") && recipient.getCompound("nilakan_doll").isEmpty(), "Other player's private links are not exposed");
-        });
-    }
-
-    @GameTest(template = "empty")
     public static void hudOfflineTargetAndWireRoundTrip(GameTestHelper h) {
         run(h, f -> {
             FakePlayer owner = f.player(true), target = f.player(false);
@@ -774,25 +553,6 @@ public final class ThidaGameTests {
     }
 
     @GameTest(template = "empty")
-    public static void liteHudTracksEffectBeforeRemainingCooldown(GameTestHelper h) {
-        run(h, f -> {
-            FakePlayer owner=f.player(true);
-            var data=ThidaEvents.hudSnapshot(owner);
-            h.assertTrue(data.getCompound("activeEffects").isEmpty(), "Passive links do not expose retired active-effect timers");
-            h.assertTrue(data.getCompound("cooldowns").isEmpty(), "Passive links do not expose retired active-effect cooldowns");
-        });
-    }
-
-    @GameTest(template = "empty")
-    public static void liteHudInstantCleanseAndEarlyDispel(GameTestHelper h) {
-        run(h, f -> {
-            FakePlayer caster=f.player(true), healer=f.player(true);
-            h.assertTrue(ThidaEvents.hudSnapshot(healer).getCompound("activeEffects").isEmpty(), "Passive cleanses are timer-driven rather than cast actions");
-            h.assertTrue(ThidaEvents.hudSnapshot(caster).getCompound("cooldowns").isEmpty(), "Passive links do not expose retired dispel cooldowns");
-        });
-    }
-
-    @GameTest(template = "empty")
     public static void debugResetRequiresOperatorAndPreservesPowers(GameTestHelper h) {
         run(h, f -> {
             FakePlayer owner=f.player(true), target=f.player(false);
@@ -818,52 +578,6 @@ public final class ThidaGameTests {
             h.assertTrue(state(owner).hasUUID("nilakan_doll")&&state(owner).hasUUID("heart")&&state(owner).getBoolean("heartUsed"),"Reset preserves links and consumed protection");
             near(h,state(owner).getLong("domain"),now+6000,"Reset preserves active domain");
             near(h,state(owner).getLong("hud_effect_nilakan_doll_0"),now+400,"Reset preserves active effect timer");
-        });
-    }
-
-    @GameTest(template = "empty")
-    public static void debugEndStopsPowersWithoutReward(GameTestHelper h) {
-        run(h, f -> {
-            FakePlayer owner=f.player(true), target=f.player(false);
-            use(h,owner,"parasite_doll");
-            var dollId=state(owner).getUUID("parasiteEntity");
-            state(owner).putUUID("nilakan_doll",target.getUUID());
-            state(owner).putUUID("heart",target.getUUID());
-            use(h,owner,"domain_talisman");
-            owner.setHealth(40);
-            try {
-                owner.server.getCommands().getDispatcher().execute("thida debug end "+owner.getScoreboardName(),
-                        owner.server.createCommandSourceStack().withPermission(2).withSuppressedOutput());
-            } catch(Exception e) { throw new AssertionError(e); }
-            h.assertTrue(!state(owner).hasUUID("nilakan_doll")&&!state(owner).hasUUID("heart")&&!state(owner).getBoolean("parasiteArmed"),"End clears owned links and summoned doll");
-            h.assertTrue(!state(owner).contains("domain")&&!state(owner).getBoolean("parasiteReward"),"End clears domain without parasite reward");
-            h.assertTrue(!state(owner).getBoolean("domainFx"),"Debug end closes domain visuals");
-            var doll=owner.serverLevel().getEntity(dollId);
-            h.assertTrue(doll==null||doll.isRemoved(),"End removes visual doll");
-            near(h,owner.getHealth(),40,"Debug end does not heal or injure");
-            near(h,state(owner).getLong("cd_domain_talisman")-owner.level().getGameTime(),24000,"End starts normal domain cooldown");
-            near(h,state(owner).getLong("cd_heart_doll")-owner.level().getGameTime(),12000,"End starts normal heart cooldown");
-        });
-    }
-
-    @GameTest(template = "empty")
-    public static void parasiteAppearanceAndFacing(GameTestHelper h) {
-        run(h, f -> {
-            FakePlayer owner = f.player(true);
-            use(h, owner, "parasite_doll");
-            var doll = (net.minecraft.world.entity.decoration.ArmorStand)owner.serverLevel().getEntity(state(owner).getUUID("parasiteEntity"));
-            h.assertTrue(doll != null && !doll.hasCustomName() && !doll.isCustomNameVisible(), "Summoned doll has no floating label");
-            h.assertTrue(doll.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.HEAD).is(ThidaMod.PARASITE_MASK.get()), "Doll wears custom mask");
-            for (float yaw : new float[]{0, 90, 180, -90}) {
-                owner.setYRot(yaw); owner.setXRot(20); tick(owner);
-                near(h, doll.getYRot(), yaw, "Doll follows owner yaw");
-                near(h, doll.getHeadPose().getX(), 20, "Doll follows head pitch");
-                near(h, Math.hypot(doll.getX()-owner.getX(),doll.getZ()-owner.getZ()), Math.hypot(.85,.25), "Side offset rotates with owner");
-            }
-            doll.getPersistentData().remove("thidaParasiteStyle");
-            doll.setCustomName(net.minecraft.network.chat.Component.literal("หุ่นกาฝาก")); doll.setCustomNameVisible(true);
-            tick(owner);
-            h.assertTrue(!doll.hasCustomName() && !doll.isCustomNameVisible(), "Old summoned dolls migrate without a name tag");
         });
     }
 
@@ -933,7 +647,7 @@ public final class ThidaGameTests {
         @Override public boolean canHarmPlayer(Player other) { return true; }
     }
 
-    private static final class Fixture implements AutoCloseable {
+    static final class Fixture implements AutoCloseable {
         private final GameTestHelper helper;
         private final List<FakePlayer> players = new ArrayList<>();
         private final Map<UUID, ServerPlayer> uuidIndex;

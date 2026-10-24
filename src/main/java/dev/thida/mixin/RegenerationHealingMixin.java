@@ -1,6 +1,6 @@
 package dev.thida.mixin;
 
-import dev.thida.ThidaEvents;
+import dev.thida.ThidaHealing;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.LivingEntity;
 import org.spongepowered.asm.mixin.Mixin;
@@ -15,11 +15,10 @@ public abstract class RegenerationHealingMixin {
     private void thida$regeneration(LivingEntity target, int amplifier, CallbackInfoReturnable<Boolean> cir) {
         if (!(target instanceof ServerPlayer recipient) || recipient.getHealth() >= recipient.getMaxHealth()) return;
         var data = recipient.getPersistentData();
-        if (!data.hasUUID("thida_regen_source")) return;
-        ServerPlayer caster = recipient.server.getPlayerList().getPlayer(data.getUUID("thida_regen_source"));
-        if (caster != null && caster != recipient) {
-            ThidaEvents.addonHeal(caster, recipient, 1);
-            cir.setReturnValue(true);
-        }
+        ServerPlayer caster = data.hasUUID("thida_regen_source")
+                ? recipient.server.getPlayerList().getPlayer(data.getUUID("thida_regen_source")) : null;
+        boolean external = data.hasUUID("thida_regen_source") && !data.getUUID("thida_regen_source").equals(recipient.getUUID());
+        ThidaHealing.apply(caster, recipient, 1, external ? ThidaHealing.Kind.OTHER : ThidaHealing.Kind.NON_SKILL);
+        cir.setReturnValue(true);
     }
 }

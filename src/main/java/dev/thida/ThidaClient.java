@@ -1,133 +1,179 @@
 package dev.thida;
 
+import java.util.List;
+import java.util.ArrayList;
+import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.KeyMapping;
-import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.api.distmarker.Dist;
-import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
-import net.neoforged.neoforge.client.settings.KeyConflictContext;
-import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.client.event.ClientTickEvent;
+import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
+import net.neoforged.neoforge.client.settings.KeyConflictContext;
 import org.lwjgl.glfw.GLFW;
 
-/** Client-only entry point: the server never loads Minecraft or Screen classes. */
 @EventBusSubscriber(modid = "thida", value = Dist.CLIENT)
 public final class ThidaClient {
-    public static final KeyMapping OPEN_MENU = new KeyMapping("key.thida.open_doll_menu",
-            KeyConflictContext.IN_GAME, InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_R, "key.categories.thida");
+    public static final KeyMapping OPEN_MENU = key("open_doll_menu", GLFW.GLFW_KEY_1);
+    public static final KeyMapping SUMMON = key("summon_parasite", GLFW.GLFW_KEY_2);
+    public static final KeyMapping HEART = key("heart_bond", GLFW.GLFW_KEY_3);
+    static { ThidaClientEffects.installConfirmation(ThidaClient::confirmation); }
+    private static KeyMapping key(String id, int code) {
+        return new KeyMapping("key.thida." + id, KeyConflictContext.IN_GAME, InputConstants.Type.KEYSYM, code, "key.categories.thida");
+    }
     @EventBusSubscriber(modid = "thida", value = Dist.CLIENT, bus = EventBusSubscriber.Bus.MOD)
     public static final class KeyRegistration {
-        @SubscribeEvent public static void register(RegisterKeyMappingsEvent event) { event.register(OPEN_MENU); }
+        @SubscribeEvent public static void register(RegisterKeyMappingsEvent e) {
+            e.register(OPEN_MENU); e.register(SUMMON); e.register(HEART);
+        }
     }
-    private static boolean doll(ItemStack stack) {
-        return stack.is(ThidaMod.ABILITIES.get("nilakan_doll").get())
-                || stack.is(ThidaMod.ABILITIES.get("narotra_doll").get());
+    private static void request(String action, String doll, int spell) {
+        var n = new CompoundTag(); n.putString("action", action); n.putString("doll", doll); n.putInt("spell", spell);
+        net.neoforged.neoforge.network.PacketDistributor.sendToServer(new ThidaNetwork.SkillAction(n));
     }
-    @SubscribeEvent
-    public static void key(ClientTickEvent.Pre event) {
-        while (OPEN_MENU.consumeClick()) openMenu();
+    private static void drainConflicts(KeyMapping key) {
+        var mc = Minecraft.getInstance();
+        for (var other : mc.options.keyMappings) if (other != key && other.same(key)) {
+            while (other.consumeClick()) {} other.setDown(false);
+        }
+    }
+    @SubscribeEvent public static void tick(ClientTickEvent.Pre event) {
+        var mc = Minecraft.getInstance(); if (mc.player == null || mc.screen != null) return;
+        if (!ThidaHudConfig.INPUT_V7.get()) {
+            if (OPEN_MENU.getKey().getValue() == GLFW.GLFW_KEY_R) {
+                OPEN_MENU.setKey(InputConstants.Type.KEYSYM.getOrCreate(GLFW.GLFW_KEY_1));
+                KeyMapping.resetMapping(); mc.options.save();
+            }
+            ThidaHudConfig.INPUT_V7.set(true); ThidaHudConfig.INPUT_V7.save();
+        }
+        while (OPEN_MENU.consumeClick()) { drainConflicts(OPEN_MENU); openMenu(); }
+        while (SUMMON.consumeClick()) { drainConflicts(SUMMON); request("summon", "", 0); }
+        while (HEART.consumeClick()) { drainConflicts(HEART); request("heart", "", 0); }
+    }
+    public static void openMenu() {
+        var mc = Minecraft.getInstance(); if (mc.player == null) return;
+        var held = new ArrayList<String>();
+        for (String id : new String[]{"narotra_doll", "nilakan_doll"})
+            if (mc.player.getMainHandItem().is(ThidaMod.ABILITIES.get(id).get())
+                    || mc.player.getOffhandItem().is(ThidaMod.ABILITIES.get(id).get())) held.add(id);
+        mc.setScreen(new WheelScreen(null, "วิชาแห่งธิดา", choices(held)));
+    }
+    private record Choice(String icon, String title, String reason, Runnable action) {}
+    private static List<Choice> choices(List<String> held) {
+        var rows = new ArrayList<Choice>();
+        for (String kind : held) rows.add(new Choice(kind.startsWith("narotra") ? "narotra" : "nilakan",
+                kind.startsWith("narotra") ? "นรตรา" : "นิลกาล", "", () -> spells(kind)));
+        if (held.isEmpty()) rows.add(new Choice("narotra", "ถือหุ่นเพื่อเปิดรายการคาถา", "ยังไม่ได้ถือหุ่นนรตราหรือนิลกาล", () -> {}));
+        rows.add(new Choice("unlink", "จัดตำแหน่ง HUD", "", () -> Minecraft.getInstance().setScreen(new ThidaBondHud.PositionScreen(Minecraft.getInstance().screen))));
+        return rows;
+    }
+    private static void spells(String kind) {
+        request("select", kind, 0);
+        var mc = Minecraft.getInstance(); Screen parent = mc.screen;
+        String[] names = kind.equals("narotra_doll") ? new String[]{"คุ้มครองจากดาเมจ", "ชำระและกันดีบัฟ", "ความเร็วและฟื้นพลังชีวิต"}
+                : new String[]{"ลดดาเมจและความเร็วโจมตี", "เลือดไหลและตาบอด", "เพิ่มดาเมจที่เป้าหมายได้รับ"};
+        String[] icons = kind.equals("narotra_doll") ? new String[]{"shield", "cleanse", "speed"} : new String[]{"weak", "bleed", "vulnerable"};
+        var rows = new ArrayList<Choice>();
+        for (int i = 0; i < 3; i++) {
+            final int spell = i;
+            rows.add(new Choice(icons[i], names[i], kind + "_" + i, () -> request("cast", kind, spell)));
+        }
+        rows.add(new Choice("unlink", "ยกเลิกสายสัมพันธ์", "unlink:" + kind, () -> {
+            request("unlink", kind, 0); mc.setScreen(parent);
+        }));
+        mc.setScreen(new WheelScreen(parent, kind.equals("narotra_doll") ? "คาถานรตรา" : "คาถานิลกาล", rows));
+    }
+    private static void confirmation(CompoundTag data) {
+        var mc = Minecraft.getInstance(); if (mc.player == null || !data.hasUUID("target")) return;
+        boolean end = data.getString("kind").equals("heart_end");
+        var rows = new ArrayList<Choice>(); Screen previous = mc.screen;
+        rows.add(new Choice("heart", "ยืนยัน", "", () -> confirm(data, true, previous)));
+        rows.add(new Choice("unlink", "ไม่ยืนยัน", "", () -> confirm(data, false, previous)));
+        mc.setScreen(new WheelScreen(previous, (end ? "ยกเลิกพันธะกับ " : "เชื่อมกับ ") + data.getString("name") + "?", rows,
+                () -> confirm(data, false, previous)));
+    }
+    private static void confirm(CompoundTag data, boolean accept, Screen previous) {
+        var n = data.copy(); n.putString("action", "confirm"); n.putBoolean("accept", accept);
+        net.neoforged.neoforge.network.PacketDistributor.sendToServer(new ThidaNetwork.SkillAction(n));
+        Minecraft.getInstance().setScreen(previous);
+    }
+    private static final class WheelScreen extends Screen {
+        private final Screen parent; private final List<Choice> rows; private int selected; private final Runnable cancel;
+        WheelScreen(Screen parent, String title, List<Choice> rows) { this(parent, title, rows, null); }
+        WheelScreen(Screen parent, String title, List<Choice> rows, Runnable cancel) { super(Component.literal(title)); this.parent = parent; this.rows = rows; this.cancel = cancel; }
+        @Override public boolean isPauseScreen() { return false; }
+        @Override public void onClose() { clearAttack(); if (cancel != null) cancel.run(); else minecraft.setScreen(parent); }
+        private void clearAttack() {
+            minecraft.options.keyAttack.setDown(false); while (minecraft.options.keyAttack.consumeClick()) {}
+        }
+        private String reason(Choice choice) {
+            var data = ThidaHudState.snapshot();
+            if (choice.reason().startsWith("unlink:")) return data.getCompound(choice.reason().substring(7)).getString("id").isEmpty() ? "ยังไม่มีสายสัมพันธ์" : "";
+            if (choice.reason().startsWith("narotra_doll_") || choice.reason().startsWith("nilakan_doll_")) {
+                if (!data.getBoolean("thida")) return "ต้องเลือกเผ่ากำเนิดธิดา";
+                return data.getString("spellReason_" + choice.reason());
+            }
+            return choice.reason();
+        }
+        @Override public boolean mouseScrolled(double x, double y, double horizontal, double vertical) {
+            if (vertical != 0) selected = Math.floorMod(selected + (vertical < 0 ? 1 : -1), rows.size());
+            return true;
+        }
+        @Override public boolean mouseClicked(double x, double y, int button) {
+            clearAttack();
+            if (button == 1) { onClose(); return true; }
+            if (button == 0) {
+                var row = rows.get(selected); String reason = reason(row);
+                if (reason.isEmpty()) row.action().run();
+                else if (minecraft.player != null) minecraft.player.displayClientMessage(Component.literal(reason), true);
+            }
+            return true;
+        }
+        @Override public boolean keyPressed(int key, int scan, int modifiers) {
+            if (key == GLFW.GLFW_KEY_ESCAPE) { onClose(); return true; }
+            if (key >= GLFW.GLFW_KEY_0 && key <= GLFW.GLFW_KEY_9) return true;
+            return super.keyPressed(key, scan, modifiers);
+        }
+        @Override public void render(GuiGraphics g, int mouseX, int mouseY, float partial) {
+            renderBackground(g, mouseX, mouseY, partial);
+            int w = Math.min(380, width - 16), h = 51 + rows.size() * 35, x = (width - w) / 2, y = Math.max(8, (height - h) / 2);
+            ThidaGui.frame(g, x, y, w, h, 0xFF91DAC2, true);
+            ThidaGui.text(g, title.getString(), x + 10, y + 8, w - 20, ThidaGui.TEXT);
+            for (int i = 0; i < rows.size(); i++) {
+                var row = rows.get(i); String reason = reason(row); boolean active = i == selected;
+                int ry = y + 25 + i * 35;
+                if (active) ThidaGui.frame(g, x + 5, ry, w - 10, 32, 0xFF91DAC2, true);
+                ThidaGui.icon(g, row.icon(), x + 11, ry + 6, 1);
+                ThidaGui.text(g, (active ? "› " : "  ") + row.title(), x + 34, ry + 5, w - 48, reason.isEmpty() ? ThidaGui.TEXT : ThidaGui.MUTED);
+                String status = reason.isEmpty() ? "คลิกซ้ายที่ใดก็ได้เพื่อเลือก" : reason;
+                ThidaGui.text(g, status, x + 43, ry + 19, w - 57, reason.isEmpty() ? ThidaGui.MUTED : ThidaGui.GOLD);
+            }
+            ThidaGui.text(g, "ลูกกลิ้ง: เลื่อน  •  คลิกขวา / Esc: ย้อนกลับ", x + 10, y + h - 15, w - 20, ThidaGui.MUTED);
+            super.render(g, mouseX, mouseY, partial);
+        }
     }
     @SubscribeEvent(priority = net.neoforged.bus.api.EventPriority.HIGH)
     public static void tooltip(net.neoforged.neoforge.event.entity.player.ItemTooltipEvent event) {
         String item = ThidaEvents.id(event.getItemStack());
+        if (ThidaTooltips.passive(item) || item.equals("parasite_doll")) {
+            var row = ThidaHudState.snapshot().getCompound(item.equals("parasite_doll") ? "parasite" : item);
+            var tag = ThidaItemData.read(event.getItemStack());
+            String token = item.equals("parasite_doll") ? "thida_parasite_instance" : "thida_passive_instance";
+            boolean linked = tag.hasUUID(token) && row.hasUUID("itemInstance") && tag.getUUID(token).equals(row.getUUID("itemInstance"));
+            event.getToolTip().add(Component.literal(linked ? "เชื่อมกับ: " + row.getString("name") + " · " + row.getString("status") : "ยังไม่มีสายสัมพันธ์")
+                    .withStyle(linked ? net.minecraft.ChatFormatting.GREEN : net.minecraft.ChatFormatting.DARK_GRAY));
+        }
         if (!ThidaTooltips.passive(item) || !Screen.hasShiftDown()) return;
         var lines = event.getToolTip();
-        for (int i = 0; i < lines.size(); i++) {
-            if (lines.get(i).getContents() instanceof net.minecraft.network.chat.contents.TranslatableContents text
-                    && text.getKey().equals(ThidaTooltips.MORE)) {
-                lines.remove(i);
-                var details = new java.util.ArrayList<Component>();
-                ThidaTooltips.appendDetails(item, details);
-                lines.addAll(i, details);
-                return;
-            }
-        }
-    }
-    private static void openMenu() {
-        Minecraft mc = Minecraft.getInstance();
-        if (mc.player == null || mc.screen != null) return;
-        ItemStack held = mc.player.getMainHandItem();
-        if (!doll(held)) held = mc.player.getOffhandItem();
-        if (!doll(held)) return;
-        // A user may bind this to a number or mouse button. Suppress its competing game action.
-        for (KeyMapping mapping : mc.options.keyMappings) if (mapping != OPEN_MENU && mapping.same(OPEN_MENU)) {
-            while (mapping.consumeClick()) { }
-            mapping.setDown(false);
-        }
-        net.neoforged.neoforge.network.PacketDistributor.sendToServer(new ThidaNetwork.DollAction(1));
-        mc.setScreen(new DollScreen(held.is(ThidaMod.ABILITIES.get("narotra_doll").get())));
-    }
-    private static final class DollScreen extends Screen {
-        private final boolean blessing;
-        private final java.util.List<SkillButton> buttons = new java.util.ArrayList<>();
-        private final String item;
-        private int left, top;
-        DollScreen(boolean blessing) {
-            super(Component.literal(blessing ? "นรตรา" : "นิลกาล"));
-            this.blessing=blessing;
-            this.item=blessing?"narotra_doll":"nilakan_doll";
-        }
-        @Override protected void init() {
-            buttons.clear(); left=(width-272)/2; top=Math.max(6,(height-150)/2);
-            String name=blessing?"ยกเลิกสายสัมพันธ์":"ปลดสายสัมพันธ์";
-            SkillButton widget=new SkillButton(left+6,top+76,260,35,"unlink",name,"ยกเลิกการเชื่อมเป้าหมาย",1,
-                    blessing?0xFF91DAC2:0xFFD3A4EC,b->choose(1));
-            buttons.add(addRenderableWidget(widget));
-            refresh();
-        }
-        @Override public boolean isPauseScreen() { return false; }
-        @Override public void tick() { refresh(); }
-        private void refresh() {
-            var data=ThidaHudState.snapshot();
-            boolean linked=!data.getCompound(item).getString("id").isEmpty();
-            SkillButton button=buttons.get(0);
-            button.active=data.getBoolean("thida")&&linked;
-            button.status=!data.getBoolean("thida")?"ต้องเลือกเผ่ากำเนิดธิดา":!linked?"ยังไม่มีสายสัมพันธ์":button.description;
-        }
-        private void choose(int button) {
-            refresh();
-            if(button!=1||!buttons.get(0).active) return;
-            net.neoforged.neoforge.network.PacketDistributor.sendToServer(new ThidaNetwork.DollAction(5)); onClose();
-        }
-        @Override public boolean keyPressed(int key,int scan,int modifiers) {
-            if(key==GLFW.GLFW_KEY_1) { choose(1); return true; }
-            return super.keyPressed(key,scan,modifiers);
-        }
-        @Override public void render(GuiGraphics graphics,int mouseX,int mouseY,float partialTick) {
-            renderBackground(graphics, mouseX, mouseY, partialTick); refresh();
-            int accent=blessing?0xFF91DAC2:0xFFD3A4EC;
-            ThidaGui.frame(graphics,left,top,272,150,accent,true);
-            ThidaGui.icon(graphics,blessing?"narotra":"nilakan",left+10,top+6,2);
-            ThidaGui.text(graphics,title.getString()+(blessing?" · ฟื้นมานา":" · เสริมพลัง"),left+49,top+9,214,accent);
-            var link=ThidaHudState.snapshot().getCompound(item);
-            ThidaGui.text(graphics,link.getString("id").isEmpty()?"ถือหุ่นเพื่อเชื่อมเป้าหมาย":"ผูกกับ "+link.getString("name"),left+49,top+24,214,ThidaGui.TEXT);
-            ThidaGui.text(graphics,"กด 1 เพื่อยกเลิกการเชื่อม",left+10,top+135,174,ThidaGui.MUTED);
-            ThidaGui.text(graphics,"Esc ปิด",left+211,top+135,55,ThidaGui.GOLD);
-            super.render(graphics,mouseX,mouseY,partialTick);
-        }
-    }
-    private static final class SkillButton extends net.minecraft.client.gui.components.Button {
-        private final String icon, description;
-        private final int number, accent;
-        private String status;
-        SkillButton(int x,int y,int w,int h,String icon,String name,String description,int number,int accent,OnPress press) {
-            super(x,y,w,h,Component.literal(name+" — "+description),press,DEFAULT_NARRATION);
-            this.icon=icon; this.description=description; this.number=number; this.accent=accent; this.status=description;
-        }
-        @Override protected void renderWidget(GuiGraphics g,int mouseX,int mouseY,float tick) {
-            ThidaGui.frame(g,getX(),getY(),width,height,active?accent:0xFF796780,isHoveredOrFocused()&&active);
-            ThidaGui.icon(g,icon,getX()+4,getY()+2,2);
-            if(!active) g.fill(getX()+4,getY()+2,getX()+36,getY()+34,0x80211D2D);
-            String title=getMessage().getString().split(" — ",2)[0];
-            ThidaGui.text(g,title,getX()+43,getY()+6,width-76,active?ThidaGui.TEXT:ThidaGui.MUTED);
-            ThidaGui.text(g,status,getX()+43,getY()+20,width-76,active?ThidaGui.MUTED:ThidaGui.GOLD);
-            ThidaGui.frame(g,getX()+width-25,getY()+8,18,18,accent,isHoveredOrFocused());
-            ThidaGui.text(g,Integer.toString(number),getX()+width-19,getY()+13,9,active?accent:ThidaGui.MUTED);
+        for (int i = 0; i < lines.size(); i++) if (lines.get(i).getContents() instanceof net.minecraft.network.chat.contents.TranslatableContents text
+                && text.getKey().equals(ThidaTooltips.MORE)) {
+            lines.remove(i); var extra = new ArrayList<Component>(); ThidaTooltips.appendDetails(item, extra); lines.addAll(i, extra); return;
         }
     }
     private ThidaClient() {}

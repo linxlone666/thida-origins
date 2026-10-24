@@ -116,7 +116,7 @@ public final class ThidaHud {
                             ThidaHudState.remaining(data.getCompound("activeEffects").getLong(key)),
                             ThidaGui.remaining(data,"cd_effect_"+key),data.getInt("effectDuration"),data.getInt("effectTotal"),false);
                 }
-                // The ten-minute unlink cooldown is separate from each thirty-second spell cooldown.
+                // Doll suspension and each spell cooldown have separate timelines.
                 add(badges,i==0?"nilakan":"narotra","",0,ThidaGui.remaining(data,"cd_"+dolls[i]),0,data.getInt("releaseTotal"),false);
             }
             add(badges,"parasite","",0,ThidaGui.remaining(data,"cd_parasite_doll"),0,data.getInt("releaseTotal"),
@@ -125,7 +125,7 @@ public final class ThidaHud {
                     !data.getCompound("heart").getString("id").isEmpty());
             add(badges,"domain","",ThidaHudState.remaining(data.getLong("domain")),ThidaGui.remaining(data,"cd_domain_talisman"),
                     data.getInt("domainTotal"),data.getInt("domainCooldownTotal"),false);
-            if(data.getInt("gaze")>0) add(badges,"narotra","จ",Math.max(1,data.getInt("gazeRequired")-data.getInt("gaze")),0,data.getInt("gazeRequired"),0,false);
+            if(data.getInt("gaze")>0) add(badges,"narotra","",data.getInt("gaze"),0,data.getInt("gazeRequired"),0,false);
         }
         if(!data.getString("guardian").isEmpty()) add(badges,"heart","",0,0,0,0,true);
         add(badges,"shield","!",ThidaHudState.remaining(data.getLong("invulnerable")),0,100,0,false);
@@ -133,9 +133,9 @@ public final class ThidaHud {
             // Local placement sample only: no real effect, cooldown or network state is changed.
             badges.clear();
             long left = previewUntil - mc.level.getGameTime();
-            add(badges,"speed","ท",left+200,0,400,0,false);
-            add(badges,"domain","ท",0,left,0,200,false);
-            add(badges,"heart","ท",0,0,0,0,true);
+            add(badges,"speed","",left+200,0,400,0,false);
+            add(badges,"domain","",0,left,0,200,false);
+            add(badges,"heart","",0,0,0,0,true);
         }
         if(badges.isEmpty()) return;
         int sw=mc.getWindow().getGuiScaledWidth(), sh=mc.getWindow().getGuiScaledHeight();
@@ -143,7 +143,9 @@ public final class ThidaHud {
         int rows=(badges.size()+cols-1)/cols;
         int x=Math.min(ThidaHudConfig.X.get(),Math.max(0,sw-Math.min(cols,badges.size())*38-4));
         int y=Math.min(ThidaHudConfig.Y.get(),Math.max(0,sh-rows*39-4));
+        y=ThidaBondHud.avoidOverlap(x,y,Math.min(cols,badges.size())*38,rows*39);
         var g=event.getGuiGraphics();
+        if (mc.level != null && previewUntil > mc.level.getGameTime()) ThidaGui.text(g,"ตัวอย่าง",x,Math.max(0,y-12),140,ThidaGui.GOLD);
         for(int i=0;i<badges.size();i++) {
             Badge badge=badges.get(i);
             int bx=x+(i%cols)*38, by=y+(i/cols)*39;

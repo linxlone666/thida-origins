@@ -35,7 +35,7 @@ public final class ThidaHudCommands {
                 })))
                 .then(Commands.literal("preview").executes(c -> {
                     ThidaHud.preview();
-                    c.getSource().sendSuccess(() -> Component.literal("แสดงไอคอนตัวอย่าง ท 10 วินาที — ปิดแชตเพื่อดู ไม่มีผลต่อสกิลจริง"), false);
+                    c.getSource().sendSuccess(() -> Component.literal("แสดงไอคอนตัวอย่าง 10 วินาที — ปิดแชตเพื่อดู ไม่มีผลต่อสกิลจริง"), false);
                     return 1;
                 }))
                 .then(Commands.literal("reset").executes(c -> {

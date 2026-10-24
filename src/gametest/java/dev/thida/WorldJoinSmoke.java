@@ -35,7 +35,7 @@ public final class WorldJoinSmoke {
         }
         if (client.player == null || client.level == null || client.getSingleplayerServer() == null) return;
         if (joined == 0) joined = System.nanoTime();
-        if (!checked && System.nanoTime() - joined > 10_000_000_000L) {
+        if (!checked && System.nanoTime() - joined > (Boolean.getBoolean("thida.uiSmoke") ? 120_000_000_000L : 10_000_000_000L)) {
             checked = true;
             var server = client.getSingleplayerServer();
             server.execute(() -> {

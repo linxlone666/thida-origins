@@ -26,6 +26,12 @@ import java.util.List;
 public final class ThidaMod {
     public static final String MOD_ID = "thida";
     public static final DeferredRegister.Items ITEMS = DeferredRegister.createItems(MOD_ID);
+    public static final DeferredRegister<net.minecraft.world.effect.MobEffect> EFFECTS = DeferredRegister.create(
+            net.minecraft.core.registries.Registries.MOB_EFFECT, MOD_ID);
+    public static final DeferredHolder<net.minecraft.world.effect.MobEffect, net.minecraft.world.effect.MobEffect> HEART_BLEED =
+            EFFECTS.register("heart_bleed", () -> new net.minecraft.world.effect.MobEffect(net.minecraft.world.effect.MobEffectCategory.HARMFUL, 0xA82E45) {});
+    public static final DeferredHolder<net.minecraft.world.effect.MobEffect, net.minecraft.world.effect.MobEffect> SPELL_BLEED =
+            EFFECTS.register("spell_bleed", () -> new net.minecraft.world.effect.MobEffect(net.minecraft.world.effect.MobEffectCategory.HARMFUL, 0x7F2B5C) {});
     public static final DeferredItem<Item> PARASITE_MASK = ITEMS.register("parasite_mask", () -> new Item(new Item.Properties().stacksTo(1)));
     public static final Map<String, DeferredItem<? extends Item>> ABILITIES = new LinkedHashMap<>();
     // Old IDs remain inert for existing saves; excluded from kits, creative tabs and recipes.
@@ -44,6 +50,7 @@ public final class ThidaMod {
     public ThidaMod(IEventBus bus, ModContainer container) {
 
         ITEMS.register(bus);
+        EFFECTS.register(bus);
         bus.addListener(ThidaNetwork::register);
         bus.addListener(this::creativeItems);
         container.registerConfig(ModConfig.Type.SERVER, ThidaConfig.SPEC);
@@ -52,9 +59,11 @@ public final class ThidaMod {
     }
     private void creativeItems(BuildCreativeModeTabContentsEvent event) {
         if (event.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES)
-            ABILITIES.values().forEach(event::accept);
+            ABILITIES.entrySet().stream().filter(e -> !e.getKey().equals("parasite_doll") && !e.getKey().equals("heart_doll"))
+                    .map(java.util.Map.Entry::getValue).forEach(event::accept);
     }
     private void commands(RegisterCommandsEvent event) {
+        ThidaPermissions.register(event.getDispatcher());
         ThidaDebug.register(event.getDispatcher());
         event.getDispatcher().register(Commands.literal("thida")
             .then(Commands.literal("kit").executes(ctx -> {
@@ -63,7 +72,7 @@ public final class ThidaMod {
                     ctx.getSource().sendFailure(Component.literal("เลือกเผ่ากำเนิดธิดาก่อน"));
                     return 0;
                 }
-                for (DeferredItem<? extends Item> item : ABILITIES.values()) {
+                for (DeferredItem<? extends Item> item : java.util.List.of(ABILITIES.get("narotra_doll"), ABILITIES.get("nilakan_doll"))) {
                     if (!player.getInventory().contains(new ItemStack(item.get()))) {
                         ItemStack stack = new ItemStack(item.get());
                         if (!player.addItem(stack)) player.drop(stack, false);
@@ -73,12 +82,28 @@ public final class ThidaMod {
                 return 1;
             }))
             .then(Commands.literal("help").executes(ctx -> {
-                ctx.getSource().sendSuccess(() -> Component.literal("/thida kit | ถือหุ่นกดปุ่มเปิดเมนู (เริ่มต้น R; เปลี่ยนได้ในการตั้งค่าปุ่ม) แล้วกด 1 เพื่อยกเลิกสายสัมพันธ์ | นิลกาล: โจมตีผู้เล่นใน 10 บล็อกเพื่อเชื่อม | นรตรา: จ้องผู้เล่นใน 15 บล็อก 10 วินาทีเพื่อเชื่อม | กาฝาก: คลิกขวาเสกแล้วโจมตีเพื่อเชื่อม | พันธะ/โดเมน: คลิกขวา"), false);
+                ctx.getSource().sendSuccess(() -> Component.literal("/thida kit | ปุ่มเริ่มต้น 1: เมนูหุ่น ใช้ลูกกลิ้งเลื่อนและคลิกซ้ายเพื่อเลือก | 2: เรียกกาฝาก | 3: พันธะหทัย | คลิกขวาหรือ Esc: ย้อนกลับ | OP ปลดแยกด้วย /thida unlock <ผู้เล่น> skill2 หรือ skill3 | เปลี่ยนปุ่มได้ในการตั้งค่าปุ่ม"), false);
                 return 1;
             })));
     }
     public static final class AbilityItem extends Item {
         public AbilityItem(Properties properties) { super(properties); }
+        @Override public boolean onDroppedByPlayer(ItemStack stack,Player player) {
+            if(ThidaDollInventory.isDoll(stack)) {
+                if(player instanceof ServerPlayer p) {
+                    ThidaEvents.tell(p,"หุ่นไม่สามารถโยนหรือย้ายออกจากตัวได้"); p.containerMenu.broadcastFullState();
+                }
+                return false;
+            }
+            return super.onDroppedByPlayer(stack,player);
+        }
+        @Override public boolean canFitInsideContainerItems() {
+            return !ThidaDollInventory.isDoll(this) && super.canFitInsideContainerItems();
+        }
+        @Override public void inventoryTick(ItemStack stack, Level level, net.minecraft.world.entity.Entity entity, int slot, boolean selected) {
+            ThidaBonds.discardExpiredDoll(stack, level);
+            super.inventoryTick(stack, level, entity, slot, selected);
+        }
         @Override public void appendHoverText(ItemStack stack, Item.TooltipContext context, List<Component> lines, TooltipFlag flag) {
             ThidaTooltips.append(ThidaEvents.id(stack), lines);
         }

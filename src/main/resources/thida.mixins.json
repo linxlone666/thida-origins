@@ -3,6 +3,7 @@
   "minVersion": "0.8",
   "package": "dev.thida.mixin",
   "compatibilityLevel": "JAVA_21",
-  "mixins": ["HealingEffectMixin", "RegenerationSourceMixin", "RegenerationHealingMixin", "AdvancedFakePlayerConnectionMixin", "AdvancedFakePlayerStartupMixin"],
+  "client": ["DollClientDropMixin"],
+  "mixins": ["DollContainerMixin", "DollSlotMixin", "HealingEffectMixin", "RegenerationSourceMixin", "RegenerationHealingMixin", "AttributedHealingMixin", "NaturalHealingMixin", "PotionHealingContextMixin", "HeartInvulnerabilityMixin", "AdvancedFakePlayerConnectionMixin", "AdvancedFakePlayerStartupMixin"],
   "injectors": {"defaultRequire": 1}
 }

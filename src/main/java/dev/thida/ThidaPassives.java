@@ -21,7 +21,6 @@ import net.minecraft.core.registries.BuiltInRegistries;
 @EventBusSubscriber(modid = "thida")
 public final class ThidaPassives {
     private static final String INSTANCE_TAG = "thida_passive_instance";
-    private static final int MAX_RANGE = 200;
     private static final int NAROTRA_START_RANGE = 15;
     private static final int NILAKAN_START_RANGE = 10;
     private static final int GAZE_TICKS = 200;
@@ -48,6 +47,9 @@ public final class ThidaPassives {
     }
     private static boolean hasInstance(ServerPlayer p, String item, UUID wanted) {
         if (wanted == null) return false;
+        var carried=p.containerMenu.getCarried(); var carriedTag=ThidaItemData.read(carried);
+        if(ThidaEvents.id(carried).equals(item) && carriedTag.hasUUID(INSTANCE_TAG) && carriedTag.getUUID(INSTANCE_TAG).equals(wanted)) return true;
+        if(ThidaDollInventory.retainedToken(p,INSTANCE_TAG,wanted)) return true;
         for (ItemStack stack : p.getInventory().items)
             if (ThidaEvents.id(stack).equals(item) && !ThidaItemData.read(stack).isEmpty() && ThidaItemData.read(stack).hasUUID(INSTANCE_TAG)
                     && ThidaItemData.read(stack).getUUID(INSTANCE_TAG).equals(wanted)) return true;
@@ -66,7 +68,7 @@ public final class ThidaPassives {
     private static boolean available(ServerPlayer owner, ServerPlayer target) {
         return ThidaEvents.isThida(owner) && owner.isAlive() && !owner.isSpectator()
                 && target != null && target.isAlive() && !target.isSpectator()
-                && owner.level() == target.level() && withinRange(owner.distanceToSqr(target), MAX_RANGE);
+                && owner.level() == target.level() && ThidaBonds.dollsAllowed(owner) && !ThidaBonds.conflictingPassives(owner);
     }
     private static void message(ServerPlayer p, String thai) {
         ThidaEvents.tell(p, thai);
@@ -107,6 +109,7 @@ public final class ThidaPassives {
     }
 
     private static void updateNarotraGaze(ServerPlayer p, CompoundTag n, long time) {
+        if (!ThidaBonds.dollsAllowed(p)) { cancelGaze(p, n, "DOLLS_LOCKED"); return; }
         if (n.hasUUID("narotra_doll") || !p.isAlive() || p.isSpectator()) {
             cancelGaze(p, n, "ALREADY_LINKED");
             if (n.hasUUID("narotra_doll") && !heldStack(p, "narotra_doll").isEmpty()
@@ -136,6 +139,7 @@ public final class ThidaPassives {
             if (reason != null) { cancelGaze(p, n, reason); return; }
         } else current = aimedNarotra(p);
         if (current == null) { cancelGaze(p, n, "NO_TARGET_IN_RANGE_OR_SIGHT"); return; }
+        if (!ThidaBonds.canLink(p, current, "narotra_doll")) { cancelGaze(p, n, "TARGET_ALREADY_LINKED"); return; }
         if (!n.hasUUID("gazeTarget")) {
             UUID itemId = instance(held);
             n.putUUID("gazeTarget", current.getUUID());
@@ -152,6 +156,7 @@ public final class ThidaPassives {
             n.putUUID("passive_narotra_item", itemId);
             n.putLong("passive_narotra_cleanse_at", time);
             n.putBoolean("passive_narotra_active", true);
+            ThidaBonds.recordPassive(p, current, "narotra_doll");
             n.remove("gaze"); n.remove("gazeTarget"); n.remove("passive_gaze_item");
             message(p, "นรตราเชื่อมกับ " + current.getScoreboardName());
             ThidaPassiveEffects.emit("NAROTRA_LINKED", "NAROTRA", p, current, position(p), heldHand(p, "narotra_doll"), "");
@@ -184,9 +189,12 @@ public final class ThidaPassives {
                 || !(event.getTarget() instanceof ServerPlayer target)) return;
         ItemStack held = heldStack(owner, "nilakan_doll");
         if (held.isEmpty()) return;
+        if (ThidaEvents.isThida(owner) && !ThidaBonds.dollsAllowed(owner)) {
+            message(owner, "หุ่นถูกพักหรือกำลังติดคูลดาวน์"); return;
+        }
         ThidaPassiveEffects.emit("NILAKAN_ATTEMPT_STARTED", "NILAKAN", owner, target, position(owner), heldHand(owner, "nilakan_doll"), "");
         CompoundTag n = data(owner);
-        if (!ThidaEvents.isThida(owner) || !owner.isAlive() || owner.isSpectator()) {
+        if (!ThidaEvents.isThida(owner) || !owner.isAlive() || owner.isSpectator() || !ThidaBonds.dollsAllowed(owner)) {
             failNilakan(owner, target, "ORIGIN_REQUIRED"); return;
         }
         if (owner == target || !withinRange(owner.distanceToSqr(target), NILAKAN_START_RANGE)) {
@@ -195,12 +203,14 @@ public final class ThidaPassives {
         if (n.hasUUID("nilakan_doll")) {
             failNilakan(owner, target, "UNLINK_BEFORE_RETARGETING"); return;
         }
+        if (!ThidaBonds.canLink(owner, target, "nilakan_doll")) { failNilakan(owner, target, "TARGET_ALREADY_LINKED"); return; }
         UUID itemId = instance(held);
         n.putUUID("nilakan_doll", target.getUUID());
         n.putString("nilakan_dollName", target.getScoreboardName());
         n.putUUID("passive_nilakan_item", itemId);
         n.putLong("passive_nilakan_cleanse_at", passiveTime(owner));
         n.putBoolean("passive_nilakan_active", available(owner, target));
+        ThidaBonds.recordPassive(owner, target, "nilakan_doll");
         message(owner, "นิลกาลเชื่อมกับ " + target.getScoreboardName());
         ThidaPassiveEffects.emit("NILAKAN_LINKED", "NILAKAN", owner, target, position(owner), heldHand(owner, "nilakan_doll"), "");
     }
@@ -210,6 +220,7 @@ public final class ThidaPassives {
             case "ORIGIN_REQUIRED" -> "ต้องเลือกเผ่ากำเนิดธิดา";
             case "OUT_OF_RANGE" -> "เป้าหมายต้องอยู่ในระยะ 10 บล็อก";
             case "UNLINK_BEFORE_RETARGETING" -> "ยกเลิกสายสัมพันธ์เดิมก่อนเลือกเป้าหมายใหม่";
+            case "TARGET_ALREADY_LINKED" -> "เป้าหมายมีสายสัมพันธ์อยู่แล้ว";
             default -> "ไม่เข้าเงื่อนไขการเชื่อม";
         };
         message(owner, "เชื่อมนิลกาลไม่ได้: " + thai);
@@ -268,18 +279,11 @@ public final class ThidaPassives {
     private static void grantManaIfReady(ServerPlayer p, long time, ServerPlayer linkOwner, ServerPlayer linkTarget) {
         CompoundTag n = data(p);
         if (n.getLong("passive_next_mana") > time) return;
-        var maxMana = BuiltInRegistries.ATTRIBUTE.getHolder(ResourceLocation.fromNamespaceAndPath("irons_spellbooks", "max_mana")).orElse(null);
-        if (maxMana == null || p.getAttribute(maxMana) == null) return;
-        float amount = manaRestoreAmount(p.getAttributeValue(maxMana));
-        if (amount <= 0 || !changeIronMana(p, amount, (float) p.getAttributeValue(maxMana))) return;
+        if (!ThidaManaIntegration.restoreFivePercent(p)) return;
         n.putLong("passive_next_mana", time + MANA_INTERVAL);
         ThidaPassiveEffects.emit("NAROTRA_MANA_RESTORED", "NAROTRA", linkOwner, linkTarget, position(p), heldHand(linkOwner, "narotra_doll"), "");
     }
 
-    private static boolean changeIronMana(ServerPlayer player, float amount, float maximum) {
-        if (!net.neoforged.fml.ModList.get().isLoaded("irons_spellbooks")) return false;
-        return ThidaIronMana.restore(player, amount, maximum);
-    }
 
     private static void applyNilakanBonus(ServerPlayer p) {
         addModifier(p, Attributes.MOVEMENT_SPEED, MOVEMENT_SPEED, "Thida Nilakan speed", 0.05D);
@@ -309,6 +313,7 @@ public final class ThidaPassives {
         ThidaPassiveEffects.emit("LINK_ENDED", passive, owner, target, position(owner), hand, reason);
         n.remove(key); n.remove(key + "Name"); n.remove("passive_" + (key.equals("narotra_doll") ? "narotra" : "nilakan") + "_item");
         n.remove("passive_" + (key.equals("narotra_doll") ? "narotra" : "nilakan") + "_active");
+        ThidaBonds.passiveEnded(owner, key);
         removeNilakanBonus(owner, key);
         if (reason.equals("DOLL_TOSSED"))
             message(owner, "หุ่นหลุดจากตัว สายสัมพันธ์" + (key.equals("narotra_doll") ? "นรตรา" : "นิลกาล") + " ถูกยกเลิก");
@@ -346,6 +351,21 @@ public final class ThidaPassives {
         String token = "passive_" + (key.equals("narotra_doll") ? "narotra" : "nilakan") + "_item";
         UUID itemId = n.hasUUID(token) ? n.getUUID(token) : null;
         return available(owner, target(owner, key)) && hasInstance(owner, key, itemId);
+    }
+    public static boolean hasLinkedDoll(ServerPlayer owner, String key) {
+        if (!key.equals("narotra_doll") && !key.equals("nilakan_doll")) return false;
+        var n = data(owner); String token = "passive_" + (key.equals("narotra_doll") ? "narotra" : "nilakan") + "_item";
+        return n.hasUUID(key) && n.hasUUID(token) && hasInstance(owner, key, n.getUUID(token));
+    }
+    public static boolean holdsLinkedDoll(ServerPlayer owner, String key) {
+        if (!hasLinkedDoll(owner, key)) return false;
+        String token = "passive_" + (key.equals("narotra_doll") ? "narotra" : "nilakan") + "_item";
+        UUID expected = data(owner).getUUID(token);
+        for (var stack : new ItemStack[]{owner.getMainHandItem(), owner.getOffhandItem()}) {
+            var tag = ThidaItemData.read(stack);
+            if (ThidaEvents.id(stack).equals(key) && tag.hasUUID(INSTANCE_TAG) && tag.getUUID(INSTANCE_TAG).equals(expected)) return true;
+        }
+        return false;
     }
 
     static float manaRestoreAmount(double maxMana) { return (float) (Math.max(0, maxMana) * 0.05D); }

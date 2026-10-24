@@ -1,6 +1,6 @@
 package dev.thida.mixin;
 
-import dev.thida.ThidaEvents;
+import dev.thida.ThidaHealing;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
@@ -17,10 +17,13 @@ public abstract class HealingEffectMixin {
     private void thida$instant(Entity direct, Entity indirect, LivingEntity target, int amplifier,
                                double potency, CallbackInfo ci) {
         if ((Object)this == MobEffects.HEAL.value() && target instanceof ServerPlayer recipient
-                && !recipient.isInvertedHealAndHarm() && indirect instanceof ServerPlayer caster
-                && caster != recipient) {
+                && !recipient.isInvertedHealAndHarm() && indirect instanceof ServerPlayer caster) {
             float amount = (int)(potency * (4 << amplifier) + 0.5D);
-            if (amount > 0) ThidaEvents.addonHeal(caster, recipient, amount);
+            var kind = caster != recipient ? ThidaHealing.Kind.OTHER
+                    : ThidaHealing.current().kind() == ThidaHealing.Kind.NON_SKILL
+                        || direct instanceof net.minecraft.world.entity.projectile.ThrownPotion
+                        ? ThidaHealing.Kind.NON_SKILL : ThidaHealing.Kind.SKILL;
+            if (amount > 0) ThidaHealing.apply(caster, recipient, amount, kind);
             ci.cancel();
         }
     }

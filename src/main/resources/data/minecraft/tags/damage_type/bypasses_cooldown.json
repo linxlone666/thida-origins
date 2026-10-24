@@ -1,6 +1,1 @@
-{
-  "replace": false,
-  "values": [
-    "thida:shared"
-  ]
-}
+{"replace": false, "values": ["thida:shared"]}
