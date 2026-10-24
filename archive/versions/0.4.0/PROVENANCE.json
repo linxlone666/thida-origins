@@ -1,0 +1,13 @@
+{
+  "version": "0.4.0",
+  "tag": "archive/v0.4.0",
+  "reconstructed_history": true,
+  "source_snapshot_available": false,
+  "checked_out_source_snapshot": "0.1.0",
+  "source_snapshot_label": null,
+  "source_archive_sha256": null,
+  "artifact": "thida-origins-1.20.1-0.4.0.jar",
+  "artifact_sha256": "4e06266734ba78654e353118aedfe5263f0f3ea6e004499219e9b1c84ca17a01",
+  "summary": "Archive 0.4.0 release; source snapshot unavailable",
+  "note": "Only the original JAR and release notes survived. No source was inferred or decompiled. The checked-out source remains the last recovered source snapshot."
+}
