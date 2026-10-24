@@ -72,6 +72,17 @@ public final class ThidaGui {
     g.drawString(font, styled(Component.literal(text)), x, y, color, false);
   }
 
+  /** Numeric values remain complete even when a custom font exceeds the reserved slot. */
+  public static void fittedText(GuiGraphics g, String text, int x, int y, int maxWidth, int color) {
+    if (text == null || text.isBlank() || maxWidth <= 0) return;
+    float scale = Math.min(1, maxWidth / (float) Math.max(1, width(text)));
+    g.pose().pushPose();
+    g.pose().translate(x, y, 0);
+    g.pose().scale(scale, scale, 1);
+    g.drawString(Minecraft.getInstance().font, styled(Component.literal(text)), 0, 0, color, false);
+    g.pose().popPose();
+  }
+
   public static long remaining(net.minecraft.nbt.CompoundTag data, String key) {
     return ThidaHudState.remaining(data.getCompound("cooldowns").getLong(key));
   }

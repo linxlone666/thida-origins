@@ -40,6 +40,24 @@ public final class HudPreviewSmoke {
       switch (stage++) {
         case 0 -> {
           persistence(mc, false);
+          var hpProbe = new CompoundTag();
+          for (int max : new int[] {100, 999, 1000, 9999, 1000000}) {
+            hpProbe.putFloat("maxHp", max);
+            for (int hp : new int[] {1, 10, 100, max}) {
+              String label = hp + " / " + max;
+              require(
+                  ThidaGui.width(label) <= ThidaBondHud.numberWidth(hpProbe),
+                  "HP digits fit: " + label);
+            }
+          }
+          hpProbe.putFloat("maxHp", 100);
+          LogUtils.getLogger()
+              .info(
+                  "THIDA_HP_FONT_FIT: text={} reserved={} digit1={} digit8={}",
+                  ThidaGui.width("100 / 100"),
+                  ThidaBondHud.numberWidth(hpProbe),
+                  ThidaGui.width("1"),
+                  ThidaGui.width("8"));
           LogUtils.getLogger()
               .info(
                   "THIDA_FONT_METRICS: default={} thida={}",
@@ -191,8 +209,8 @@ public final class HudPreviewSmoke {
       var n = new CompoundTag();
       n.putString("id", mc.player.getUUID().toString());
       n.putString("name", i == 0 ? "Mai" : "LongTargetName_ผู้เล่นชื่อยาวมาก");
-      n.putFloat("hp", i == 0 ? 18 : 1234);
-      n.putFloat("maxHp", i == 0 ? 20 : 9999);
+      n.putFloat("hp", i == 0 ? 100 : i == 1 ? 16 : 1234);
+      n.putFloat("maxHp", i == 0 ? 100 : i == 1 ? 20 : 9999);
       n.putBoolean("available", i != 2);
       n.putString("status", i == 2 ? "ออฟไลน์" : "ทำงาน");
       data.put(kind, n);

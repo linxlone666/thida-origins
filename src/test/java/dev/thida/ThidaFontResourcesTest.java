@@ -39,7 +39,8 @@ class ThidaFontResourcesTest {
               .getAsJsonArray("providers");
       assertEquals(
           "thida:itim-regular.ttf", providers.get(0).getAsJsonObject().get("file").getAsString());
-      assertEquals("minecraft:default", providers.get(1).getAsJsonObject().get("id").getAsString());
+      assertEquals(
+          "minecraft:include/unifont", providers.get(1).getAsJsonObject().get("id").getAsString());
     }
   }
 }

@@ -25,6 +25,7 @@ class ThaiLanguageTest {
         assertTrue(entry.getValue().getAsString().matches("(?s).*[ก-๛].*"), entry.getKey());
       assertEquals("ตุ๊กตานรตรา", actual.get("item.thida.narotra_doll").getAsString());
       assertEquals("ตุ๊กตานิลกาล", actual.get("item.thida.nilakan_doll").getAsString());
+      assertEquals("ตุ๊กตากาฝาก", actual.get("item.thida.parasite_doll").getAsString());
     }
   }
 }

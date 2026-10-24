@@ -1,8 +1,8 @@
 # Recovered source status
 
-Checked-out source snapshot: **0.8.5-neoforge-dev**.
+Checked-out source snapshot: **0.8.6-neoforge-dev**.
 
-Latest archived milestone: **0.8.5-neoforge-dev**.
+Latest archived milestone: **0.8.6-neoforge-dev**.
 
 Recovered source snapshot, not an original historical Git commit. Source and binary were not rebuilt to claim reproducible correspondence.
 

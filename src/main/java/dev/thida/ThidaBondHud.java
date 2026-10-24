@@ -106,14 +106,17 @@ public final class ThidaBondHud {
     return row.kind().replace("_doll", "");
   }
 
-  private static int numberWidth(CompoundTag n) {
+  static int numberWidth(CompoundTag n) {
     // Reserve by maximum HP magnitude; changing current HP cannot resize the card.
     int digits =
         Math.max(
             3,
             Math.min(
                 7, Long.toString(Math.max(1, (long) Math.ceil(n.getFloat("maxHp")))).length()));
-    return ThidaGui.width("8".repeat(digits) + " / " + "8".repeat(digits));
+    int digitWidth = 0;
+    for (int digit = 0; digit <= 9; digit++)
+      digitWidth = Math.max(digitWidth, ThidaGui.width(Integer.toString(digit)));
+    return digitWidth * digits * 2 + ThidaGui.width(" / ");
   }
 
   private static int bondWidth(boolean preview) {
@@ -187,7 +190,7 @@ public final class ThidaBondHud {
       if (!available && value.isBlank()) value = ThidaMessages.text("hud.thida.paused");
       int valueWidth = Math.min(width - 56, available ? numberWidth(n) : ThidaGui.width(value));
       ThidaGui.text(g, kind, 49, ry + 15, Math.max(0, width - 62 - valueWidth), ThidaGui.MUTED);
-      ThidaGui.text(
+      ThidaGui.fittedText(
           g,
           value,
           width - 7 - valueWidth,
