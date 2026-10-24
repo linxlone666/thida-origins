@@ -1,0 +1,1 @@
+85c0eb01fb08663fb55f1c91950c6e1ebcf4a6655f0f9d30f17d4443bd7fd0ae  thida-origins-1.20.1-0.5.4-domain-debug.jar

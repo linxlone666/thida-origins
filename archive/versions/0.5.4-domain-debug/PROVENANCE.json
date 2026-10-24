@@ -1,0 +1,13 @@
+{
+  "version": "0.5.4-domain-debug",
+  "tag": "archive/v0.5.4-domain-debug",
+  "reconstructed_history": true,
+  "source_snapshot_available": false,
+  "checked_out_source_snapshot": "0.1.0",
+  "source_snapshot_label": null,
+  "source_archive_sha256": null,
+  "artifact": "thida-origins-1.20.1-0.5.4-domain-debug.jar",
+  "artifact_sha256": "85c0eb01fb08663fb55f1c91950c6e1ebcf4a6655f0f9d30f17d4443bd7fd0ae",
+  "summary": "Archive 0.5.4-domain-debug release; source snapshot unavailable",
+  "note": "Only the original JAR and release notes survived. No source was inferred or decompiled. The checked-out source remains the last recovered source snapshot."
+}
