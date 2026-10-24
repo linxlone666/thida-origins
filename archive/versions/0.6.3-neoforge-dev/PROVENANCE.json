@@ -1,0 +1,13 @@
+{
+  "version": "0.6.3-neoforge-dev",
+  "tag": "archive/v0.6.3-neoforge-dev",
+  "reconstructed_history": true,
+  "source_snapshot_available": false,
+  "checked_out_source_snapshot": "forge-passives-pre-port",
+  "source_snapshot_label": null,
+  "source_archive_sha256": null,
+  "artifact": "thida-origins-1.21.1-neoforge-0.6.3-neoforge-dev.jar",
+  "artifact_sha256": "1fcb06f9c2031f3c6a7238ce409404e561c207e935e0ffc08744d75bd3c43a92",
+  "summary": "Archive 0.6.3-neoforge-dev release; source snapshot unavailable",
+  "note": "Only the original JAR and release notes survived. No source was inferred or decompiled. The checked-out source remains the last recovered source snapshot."
+}
