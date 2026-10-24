@@ -1,6 +1,1 @@
-{
-  "textures": {
-    "layer0": "minecraft:item/nautilus_shell"
-  },
-  "parent": "minecraft:item/generated"
-}
+{"parent":"minecraft:item/generated","textures":{"layer0":"thida:item/domain_talisman"}}

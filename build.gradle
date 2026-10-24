@@ -5,7 +5,7 @@ plugins {
 }
 
 group = 'dev.thida'
-version = '0.1.0'
+version = '0.5.5-mirror-debug'
 base.archivesName = 'thida-origins-1.20.1'
 java.toolchain.languageVersion = JavaLanguageVersion.of(17)
 
@@ -62,3 +62,7 @@ tasks.register('originDatapack', Zip) {
     destinationDirectory = layout.buildDirectory.dir('distributions')
     from('src/main/resources') { include 'pack.mcmeta'; include 'data/**' }
 }
+
+
+
+

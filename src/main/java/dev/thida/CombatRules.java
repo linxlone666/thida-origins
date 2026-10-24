@@ -22,11 +22,10 @@ public final class CombatRules {
 
     public static boolean canStartParasite(float ownerHealth, float targetHealth,
                                           double threshold, double breakHealth) {
-        return canParasite(ownerHealth, threshold) && targetHealth > 0
-                && ownerHealth + targetHealth > breakHealth;
+        return ownerHealth > 0 && targetHealth > 0;
     }
 
     public static boolean shouldBreak(float ownerHealth, float targetHealth, double threshold) {
-        return ownerHealth + targetHealth <= threshold;
+        return ownerHealth < threshold;
     }
 }

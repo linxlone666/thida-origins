@@ -20,22 +20,21 @@ class CombatRulesTest {
         assertEquals(0, CombatRules.nonlethalDamage(0.5f, 10000));
         assertEquals(2, CombatRules.nonlethalDamage(10, 2));
     }
-    @Test void parasiteBoundaryUsesStrict150HpAndInclusive50Hp() {
-        assertFalse(CombatRules.canParasite(150, 150));
-        assertTrue(CombatRules.canParasite(149.5f, 150));
-        assertFalse(CombatRules.canParasite(0, 150));
-        assertTrue(CombatRules.shouldBreak(25, 25, 50));
-        assertFalse(CombatRules.shouldBreak(25.5f, 25, 50));
+    @Test void parasiteBreakUsesOnlyCasterHealthStrictlyBelow25() {
+        assertFalse(CombatRules.shouldBreak(25, 1, 25));
+        assertTrue(CombatRules.shouldBreak(24.5f, 100, 25));
+        assertFalse(CombatRules.shouldBreak(26, 1, 25));
     }
     @Test void malformedFractionsCannotCreateNegativeDamage() {
         assertEquals(0, CombatRules.sharedDamage(-5, .5));
         assertEquals(5, CombatRules.sharedDamage(5, 2));
         assertEquals(0, CombatRules.domainDamage(5, -1));
     }
-    @Test void cannotFarmBreakHealingWithVanillaHealthPair() {
-        assertFalse(CombatRules.canStartParasite(20, 20, 150, 50));
-        assertFalse(CombatRules.canStartParasite(25, 25, 150, 50));
+    @Test void parasiteHasNoOld150HpOrCombinedHealthGate() {
+        assertTrue(CombatRules.canStartParasite(20, 20, 150, 25));
+        assertTrue(CombatRules.canStartParasite(25, 25, 150, 25));
         assertTrue(CombatRules.canStartParasite(100, 100, 150, 50));
-        assertFalse(CombatRules.canStartParasite(150, 100, 150, 50));
+        assertTrue(CombatRules.canStartParasite(150, 100, 150, 25));
+        assertFalse(CombatRules.canStartParasite(0, 100, 150, 25));
     }
 }

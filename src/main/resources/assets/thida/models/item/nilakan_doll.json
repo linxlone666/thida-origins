@@ -1,6 +1,1 @@
-{
-  "textures": {
-    "layer0": "minecraft:item/fermented_spider_eye"
-  },
-  "parent": "minecraft:item/generated"
-}
+{"parent":"minecraft:item/generated","textures":{"layer0":"thida:item/nilakan_doll"}}

@@ -1,0 +1,13 @@
+{
+  "version": "forge-passives-pre-port",
+  "tag": "recovered/forge-passives-pre-port",
+  "reconstructed_history": true,
+  "source_snapshot_available": true,
+  "checked_out_source_snapshot": "forge-passives-pre-port",
+  "source_snapshot_label": "thida-forge-1.20.1-before-neoforge-20261016.zip",
+  "source_archive_sha256": "c19033d57c3557ea02530f57d1ff2f77588101d8ee062b3c3d83a8e030e32dbf",
+  "artifact": null,
+  "artifact_sha256": null,
+  "summary": "Recover Forge passive rewrite before the NeoForge port",
+  "note": "Working source includes passive changes after the 0.5.5 release; this is not the source of the archived 0.5.5 JAR."
+}
