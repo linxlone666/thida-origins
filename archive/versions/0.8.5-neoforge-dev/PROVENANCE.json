@@ -1,0 +1,13 @@
+{
+  "version": "0.8.5-neoforge-dev",
+  "tag": "v0.8.5-neoforge-dev",
+  "reconstructed_history": true,
+  "source_snapshot_available": true,
+  "checked_out_source_snapshot": "0.8.5-neoforge-dev",
+  "source_snapshot_label": "source",
+  "source_archive_sha256": null,
+  "artifact": "thida-origins-1.21.1-neoforge-0.8.5-neoforge-dev.jar",
+  "artifact_sha256": "74fdda757c9a8925685d2fef145aa718f2e78c4768d6e3ffb4181031d2456e9c",
+  "summary": "Embed licensed Itim font with copyright and OFL notices",
+  "note": "Recovered source snapshot, not an original historical Git commit. Source and binary were not rebuilt to claim reproducible correspondence."
+}

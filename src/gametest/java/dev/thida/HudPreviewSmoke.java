@@ -143,6 +143,15 @@ public final class HudPreviewSmoke {
           if (mc.screen instanceof ThidaHudEditor) mc.screen.onClose();
           ThidaHudConfig.BOND_X.save();
           persistence(mc, true);
+          mc.setScreen(new FontTooltipPreview());
+        }
+        case 16 -> {
+          capture(mc, "font-tooltip.png");
+          mc.setScreen(null);
+          ThidaClient.openMenu();
+        }
+        case 17 -> {
+          capture(mc, "font-menu.png");
           mc.stop();
         }
       }
@@ -259,4 +268,24 @@ public final class HudPreviewSmoke {
   }
 
   private HudPreviewSmoke() {}
+
+  private static final class FontTooltipPreview extends net.minecraft.client.gui.screens.Screen {
+    private FontTooltipPreview() {
+      super(net.minecraft.network.chat.Component.literal("Font preview"));
+    }
+
+    @Override
+    public void render(net.minecraft.client.gui.GuiGraphics g, int mx, int my, float partial) {
+      var mc = Minecraft.getInstance();
+      g.fill(0, 0, width, height, 0xCC181622);
+      ThidaGui.text(
+          g, "ทดสอบฟอนต์ภาษาไทย สระ วรรณยุกต์ น้ำ ผึ้ง ผู้เล่น", 16, 16, width - 32, ThidaGui.TEXT);
+      var stack =
+          new net.minecraft.world.item.ItemStack(ThidaMod.ABILITIES.get("narotra_doll").get());
+      var lines = net.minecraft.client.gui.screens.Screen.getTooltipFromItem(mc, stack);
+      require(
+          lines.getFirst().getStyle().getFont().equals(ThidaGui.FONT), "Thida tooltip font style");
+      g.renderTooltip(mc.font, lines, java.util.Optional.empty(), 24, 48);
+    }
+  }
 }
