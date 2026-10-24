@@ -1,0 +1,13 @@
+{
+  "version": "0.8.8-neoforge-dev",
+  "tag": "v0.8.8-neoforge-dev",
+  "reconstructed_history": true,
+  "source_snapshot_available": true,
+  "checked_out_source_snapshot": "0.8.8-neoforge-dev",
+  "source_snapshot_label": "source",
+  "source_archive_sha256": null,
+  "artifact": "thida-origins-1.21.1-neoforge-0.8.8-neoforge-dev.jar",
+  "artifact_sha256": "5af64342dfd4eaeac7e1525d7577088511757fe2b7356adeba60270ade2af7ab",
+  "summary": "Size spell menus to content with compact width limits",
+  "note": "Recovered source snapshot, not an original historical Git commit. Source and binary were not rebuilt to claim reproducible correspondence."
+}

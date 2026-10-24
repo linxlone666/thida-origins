@@ -297,8 +297,22 @@ public final class ThidaClient {
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partial) {
       super.render(g, mouseX, mouseY, partial);
-      int w = Math.min(380, width - 16),
-          h = 51 + rows.size() * 35,
+      int wanted = ThidaGui.width(title.getString()) + 20;
+      var statuses = new ArrayList<String>();
+      for (var row : rows) {
+        String why = reason(row);
+        String status = why.isEmpty() ? ThidaMessages.text("ui.thida.client.render.1") : why;
+        statuses.add(status);
+        wanted =
+            Math.max(
+                wanted, Math.max(ThidaGui.width(row.title()) + 48, ThidaGui.width(status) + 57));
+      }
+      int w = HudPacking.limit(((wanted + 7) / 8) * 8, 180, Math.min(272, width - 16));
+      var hints =
+          minecraft.font.split(
+              ThidaGui.styled(Component.literal(ThidaMessages.text("ui.thida.client.render.2"))),
+              w - 20);
+      int h = 25 + rows.size() * 35 + 14 + hints.size() * 12,
           x = (width - w) / 2,
           y = Math.max(8, (height - h) / 2);
       ThidaGui.frame(g, x, y, w, h, 0xFF91DAC2, true);
@@ -317,17 +331,18 @@ public final class ThidaClient {
             ry + 5,
             w - 48,
             reason.isEmpty() ? ThidaGui.TEXT : ThidaGui.MUTED);
-        String status = reason.isEmpty() ? ThidaMessages.text("ui.thida.client.render.1") : reason;
+        String status = statuses.get(i);
         ThidaGui.text(
             g, status, x + 43, ry + 19, w - 57, reason.isEmpty() ? ThidaGui.MUTED : ThidaGui.GOLD);
       }
-      ThidaGui.text(
-          g,
-          ThidaMessages.text("ui.thida.client.render.2"),
-          x + 10,
-          y + h - 15,
-          w - 20,
-          ThidaGui.MUTED);
+      for (int i = 0; i < hints.size(); i++)
+        g.drawString(
+            minecraft.font,
+            hints.get(i),
+            x + 10,
+            y + 25 + rows.size() * 35 + 6 + i * 12,
+            ThidaGui.MUTED,
+            false);
     }
   }
 
