@@ -1,0 +1,1 @@
+4f26b839c334781bcab60de2f85e7b1d32e89b9494f5e185ae35944994f4d417  thida-origins-1.21.1-neoforge-0.7.0-neoforge-dev.jar
