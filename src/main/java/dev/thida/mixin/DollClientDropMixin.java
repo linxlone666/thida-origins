@@ -10,12 +10,13 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(LocalPlayer.class)
 public abstract class DollClientDropMixin {
-    @Inject(method="drop",at=@At("HEAD"),cancellable=true)
-    private void thida$noDropPrediction(boolean all,CallbackInfoReturnable<Boolean> cir) {
-        var player=(LocalPlayer)(Object)this;
-        if(ThidaDollInventory.isDoll(player.getMainHandItem())) {
-            player.displayClientMessage(Component.literal("หุ่นไม่สามารถโยนหรือย้ายออกจากตัวได้"),true);
-            cir.setReturnValue(false);
-        }
+  @Inject(method = "drop", at = @At("HEAD"), cancellable = true)
+  private void thida$noDropPrediction(boolean all, CallbackInfoReturnable<Boolean> cir) {
+    var player = (LocalPlayer) (Object) this;
+    if (ThidaDollInventory.isDoll(player.getMainHandItem())) {
+      player.displayClientMessage(
+          Component.literal(dev.thida.ThidaMessages.text("message.thida.passive.tossed")), true);
+      cir.setReturnValue(false);
     }
+  }
 }

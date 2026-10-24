@@ -1,4 +1,4 @@
-param([switch]$GameTests, [switch]$WithoutIron)
+param([switch]$GameTests, [switch]$WithoutIron, [string]$FakePlayerProfile, [string]$CompatProfile, [switch]$AllProfileMods)
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $bundledJdks = Get-ChildItem -LiteralPath (Join-Path $projectRoot '.tooling/java') -Directory -ErrorAction SilentlyContinue
@@ -12,6 +12,12 @@ $env:GRADLE_OPTS = '-Dorg.gradle.jvmargs=-Xmx1g'
 $gradleArguments = @('test', 'jar', 'originDatapack', '--console=plain')
 if ($GameTests) { $gradleArguments += 'runGameTestServer' }
 if ($WithoutIron) { $gradleArguments += '-PwithoutIron=true' }
+if ($FakePlayerProfile) { $gradleArguments += "-PfakePlayerProfile=$FakePlayerProfile" }
+if ($CompatProfile) { $gradleArguments += "-PcompatProfile=$CompatProfile" }
+if ($AllProfileMods) {
+    if (!$CompatProfile) { throw '-AllProfileMods requires -CompatProfile' }
+    $gradleArguments += '-PallProfileMods','-PwithConnector'
+}
 Push-Location -LiteralPath $projectRoot
 try {
     & (Join-Path $projectRoot 'gradlew.bat') @gradleArguments

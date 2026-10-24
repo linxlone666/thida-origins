@@ -10,8 +10,10 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(Slot.class)
 public abstract class DollSlotMixin {
-    @Inject(method="mayPlace",at=@At("HEAD"),cancellable=true)
-    private void thida$noExternalSlot(ItemStack stack,CallbackInfoReturnable<Boolean> cir) {
-        if(ThidaDollInventory.isDoll(stack) && !(((Slot)(Object)this).container instanceof net.minecraft.world.entity.player.Inventory)) cir.setReturnValue(false);
-    }
+  @Inject(method = "mayPlace", at = @At("HEAD"), cancellable = true)
+  private void thida$noExternalSlot(ItemStack stack, CallbackInfoReturnable<Boolean> cir) {
+    if (ThidaDollInventory.isDoll(stack)
+        && !(((Slot) (Object) this).container
+            instanceof net.minecraft.world.entity.player.Inventory)) cir.setReturnValue(false);
+  }
 }

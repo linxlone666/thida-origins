@@ -12,9 +12,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Pseudo
 @Mixin(targets = "com.advancedfakeplayers.AdvancedFakePlayers", remap = false)
 public abstract class AdvancedFakePlayerStartupMixin {
-    @Inject(method = "onServerStarted", at = @At("HEAD"), cancellable = true, remap = false)
-    private void thida$restoreAfterStartup(ServerStartedEvent event, CallbackInfo ci) {
-        ThidaFakePlayerStartup.defer(event.getServer());
-        ci.cancel();
-    }
+  @Inject(method = "onServerStarted", at = @At("HEAD"), cancellable = true, remap = false)
+  private void thida$restoreAfterStartup(ServerStartedEvent event, CallbackInfo ci) {
+    ThidaFakePlayerStartup.defer(event.getServer());
+    ci.cancel();
+  }
 }

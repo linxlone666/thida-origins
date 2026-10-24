@@ -10,7 +10,7 @@ plugins {
 }
 if (project.hasProperty('withConnector')) apply plugin: 'org.sinytra.adapter.userdev'
 group = 'dev.thida'
-version = '0.7.1-neoforge-dev'
+version = providers.gradleProperty('mod_version').get()
 base.archivesName = 'thida-origins-1.21.1-neoforge'
 layout.buildDirectory = layout.projectDirectory.dir('build-neoforge')
 java.toolchain.languageVersion = JavaLanguageVersion.of(21)
@@ -21,6 +21,7 @@ sourceSets {
     }
 }
 configurations {
+    formatter
     gametestImplementation.extendsFrom implementation
     gametestRuntimeOnly.extendsFrom runtimeOnly, localRuntime
     gametestCompileOnly.extendsFrom compileOnly
@@ -80,6 +81,7 @@ repositories {
     maven { url = 'https://maven.theillusivec4.top/' }
 }
 dependencies {
+    formatter 'com.google.googlejavaformat:google-java-format:1.24.0:all-deps'
     if (providers.gradleProperty('fakePlayerProfile').isPresent()) {
         def profile = providers.gradleProperty('fakePlayerProfile').get()
         localRuntime files(new File(profile, 'mods/advancedfakeplayers-neoforge-1.21.1-1.0.0.jar'))
@@ -114,7 +116,27 @@ dependencies {
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8' }
+tasks.register('formatJava', JavaExec) {
+    classpath = configurations.formatter
+    mainClass = 'com.google.googlejavaformat.java.Main'
+    jvmArgs(['api', 'file', 'parser', 'tree', 'util', 'code'].collect { "--add-exports=jdk.compiler/com.sun.tools.javac.${it}=ALL-UNNAMED" })
+    javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(21) }
+    args '--replace'
+    args fileTree('src') { include '**/*.java' }.files.collect { it.absolutePath }.sort()
+}
+processResources {
+    inputs.property('mod_version', project.version)
+    filesMatching('META-INF/neoforge.mods.toml') { expand(mod_version: project.version) }
+}
 test { useJUnitPlatform() }
+tasks.register('compileExamples', JavaCompile) {
+    dependsOn classes
+    source fileTree('docs/examples') { include '*.java' }
+    classpath = sourceSets.main.compileClasspath + sourceSets.main.output
+    destinationDirectory = layout.buildDirectory.dir('classes/examples')
+    javaCompiler = javaToolchains.compilerFor { languageVersion = JavaLanguageVersion.of(21) }
+}
+check.dependsOn 'compileExamples'
 
 tasks.register('verifySingleplayerSmoke') {
     dependsOn 'runSingleplayerSmoke'

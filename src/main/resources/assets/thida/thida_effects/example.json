@@ -1,0 +1,19 @@
+{
+  "schema": 1,
+  "bindings": [
+    {
+      "enabled": false,
+      "event": "*",
+      "power": "narotra_doll",
+      "spell": "narotra_shield",
+      "component": "spell",
+      "resource": "thida:preview/end_rod",
+      "anchor": "TARGET",
+      "offset": [0, 1, 0],
+      "rotationDegrees": [0, 0, 0],
+      "scale": 1,
+      "loop": true,
+      "lifetimeTicks": 0
+    }
+  ]
+}

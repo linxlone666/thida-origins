@@ -3,7 +3,7 @@ loaderVersion="[4,)"
 license="MIT"
 [[mods]]
 modId="thida"
-version="0.7.1-neoforge-dev"
+version="${mod_version}"
 displayName="ธิดา — สายสัมพันธ์และหุ่นฟาง"
 description='''เผ่ากำเนิดธิดา ผู้ใช้สายสัมพันธ์นรตราและนิลกาลผ่านหุ่นฟาง'''
 [[mixins]]

@@ -10,16 +10,23 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(LivingEntity.class)
 public abstract class AttributedHealingMixin {
-    @Unique private final java.util.ArrayDeque<Float> thida$healthBeforeHeal = new java.util.ArrayDeque<>();
-    @Inject(method = "heal", at = @At("HEAD"), cancellable = true)
-    private void thida$before(float amount, CallbackInfo ci) {
-        var entity = (LivingEntity)(Object)this;
-        if (entity.level().isClientSide) return;
-        if (ThidaHealing.blocked(entity)) { ci.cancel(); return; }
-        thida$healthBeforeHeal.push(entity.getHealth());
+  @Unique
+  private final java.util.ArrayDeque<Float> thida$healthBeforeHeal = new java.util.ArrayDeque<>();
+
+  @Inject(method = "heal", at = @At("HEAD"), cancellable = true)
+  private void thida$before(float amount, CallbackInfo ci) {
+    var entity = (LivingEntity) (Object) this;
+    if (entity.level().isClientSide) return;
+    if (ThidaHealing.blocked(entity)) {
+      ci.cancel();
+      return;
     }
-    @Inject(method = "heal", at = @At("RETURN"))
-    private void thida$after(float amount, CallbackInfo ci) {
-        if (!thida$healthBeforeHeal.isEmpty()) ThidaHealing.after((LivingEntity)(Object)this, thida$healthBeforeHeal.pop());
-    }
+    thida$healthBeforeHeal.push(entity.getHealth());
+  }
+
+  @Inject(method = "heal", at = @At("RETURN"))
+  private void thida$after(float amount, CallbackInfo ci) {
+    if (!thida$healthBeforeHeal.isEmpty())
+      ThidaHealing.after((LivingEntity) (Object) this, thida$healthBeforeHeal.pop());
+  }
 }
