@@ -1,5 +1,7 @@
 # Passive effect adapter contract
 
+Current build: Minecraft 1.21.1, NeoForge 21.1.233, Java 21, and IAFEnvoy Origins 0.4-beta.2. The optional mana adapter compiles against Iron's 1.21.1-3.16.3 API.
+
 Narotra and Nilakan rules run on the server in `ThidaPassives`. That class sends visual cues through `ThidaPassiveEffects`; it does not call AAA Particles or any client-only class. `ThidaNetwork.PassiveEffectEvent` transports the event to the linked players, and `ThidaClientEffects` forwards a copy to the installed `ThidaPassiveEffectAdapter`. The default adapter is a no-op, so both passives work without AAA Particles or effect resources.
 
 ## Event payload

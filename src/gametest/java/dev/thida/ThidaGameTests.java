@@ -25,24 +25,66 @@ import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import net.minecraftforge.common.MinecraftForge;
-import net.minecraftforge.common.util.FakePlayer;
-import net.minecraftforge.common.util.FakePlayerFactory;
-import net.minecraftforge.event.entity.living.LivingAttackEvent;
-import net.minecraftforge.event.entity.player.AttackEntityEvent;
-import net.minecraftforge.event.entity.living.LivingDamageEvent;
-import net.minecraftforge.event.entity.living.LivingHurtEvent;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.event.entity.player.PlayerEvent;
-import net.minecraftforge.gametest.GameTestHolder;
-import net.minecraftforge.gametest.PrefixGameTestTemplate;
-import net.minecraftforge.fml.util.ObfuscationReflectionHelper;
-import net.minecraftforge.registries.ForgeRegistries;
+import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.common.util.FakePlayer;
+import net.neoforged.neoforge.common.util.FakePlayerFactory;
+import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
+import net.neoforged.neoforge.event.entity.player.AttackEntityEvent;
+import net.neoforged.neoforge.event.entity.living.LivingDamageEvent;
+import net.neoforged.neoforge.common.damagesource.DamageContainer;
+import net.neoforged.neoforge.event.tick.PlayerTickEvent;
+import net.neoforged.neoforge.client.event.ClientTickEvent;
+import net.neoforged.neoforge.event.entity.player.PlayerEvent;
+import net.neoforged.neoforge.gametest.GameTestHolder;
+import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
+import net.neoforged.fml.util.ObfuscationReflectionHelper;
+import net.minecraft.core.registries.BuiltInRegistries;
 
 /** Synchronous tests: no fixture survives the test callback, even after an assertion fails. */
 @GameTestHolder("thida")
 @PrefixGameTestTemplate(false)
 public final class ThidaGameTests {
+    @GameTest(template = "empty")
+    public static void advancedFakePlayerCanSpawnAndReceiveBonds(GameTestHelper h) {
+        if (!net.neoforged.fml.ModList.get().isLoaded("advancedfakeplayers")) {
+            com.mojang.logging.LogUtils.getLogger().info("AFP_COMPAT_TEST_SKIPPED: optional mod absent");
+            h.succeed();
+            return;
+        }
+        run(h, f -> {
+            FakePlayer owner = f.player(true);
+            ServerPlayer target = null;
+            try {
+                Class<?> manager = Class.forName("com.advancedfakeplayers.manager.FakePlayerManager");
+                target = (ServerPlayer) manager.getMethod("spawnFakePlayer",
+                        net.minecraft.server.MinecraftServer.class, ServerLevel.class, GameProfile.class, boolean.class)
+                        .invoke(null, owner.server, h.getLevel(),
+                                new GameProfile(UUID.randomUUID(), "ThidaTestBot"), false);
+                h.assertTrue(owner.server.getPlayerList().getPlayer(target.getUUID()) == target,
+                        "AFP must finish login with Carry On installed");
+                target.setPos(owner.getX(), owner.getY(), owner.getZ() + 5);
+                target.setGameMode(net.minecraft.world.level.GameType.SURVIVAL);
+                selectOrigin(target, "origins:human");
+                owner.setYRot(0); owner.setXRot(0);
+                owner.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(ThidaMod.ABILITIES.get("narotra_doll").get()));
+                for (int i = 0; i <= 200; i++) ThidaPassives.tickAt(owner, state(owner), i);
+                h.assertTrue(state(owner).hasUUID("narotra_doll")
+                        && state(owner).getUUID("narotra_doll").equals(target.getUUID()), "Narotra links AFP after gaze");
+                owner.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(ThidaMod.ABILITIES.get("nilakan_doll").get()));
+                NeoForge.EVENT_BUS.post(new AttackEntityEvent(owner, target));
+                h.assertTrue(state(owner).hasUUID("nilakan_doll")
+                        && state(owner).getUUID("nilakan_doll").equals(target.getUUID()), "Nilakan links AFP on attack");
+                ThidaPassives.tickAt(owner, state(owner), 201);
+                near(h, owner.getAttributeValue(Attributes.MOVEMENT_SPEED),
+                        Attributes.MOVEMENT_SPEED.value().getDefaultValue() * 1.05, "AFP activates Nilakan bonus");
+                com.mojang.logging.LogUtils.getLogger().info("AFP_COMPAT_TEST_PASS: login, Narotra, Nilakan with Carry On");
+            } catch (ReflectiveOperationException e) {
+                throw new AssertionError("AFP 1.0.0 integration failed", e);
+            } finally {
+                if (target != null) { owner.server.getPlayerList().remove(target); target.discard(); }
+            }
+        });
+    }
     @GameTest(template = "empty")
     public static void retiredPowersAreInertAndUncraftable(GameTestHelper h) {
         run(h, f -> {
@@ -54,7 +96,7 @@ public final class ThidaGameTests {
                 p.setItemInHand(InteractionHand.MAIN_HAND,stack);
                 h.assertTrue(stack.use(p.level(),p,InteractionHand.MAIN_HAND).getResult()==InteractionResult.PASS,"Retired item cannot activate: "+entry.getKey());
                 h.assertTrue(ThidaEvents.use(p,stack,InteractionHand.MAIN_HAND).getResult()==InteractionResult.PASS,"Server rejects retired ability even through direct hook");
-                h.assertTrue(p.server.getRecipeManager().byKey(new ResourceLocation("thida",entry.getKey())).isEmpty(),"Retired recipe removed");
+                h.assertTrue(p.server.getRecipeManager().byKey(ResourceLocation.fromNamespaceAndPath("thida", entry.getKey())).isEmpty(),"Retired recipe removed");
                 h.assertTrue(!ThidaMod.ABILITIES.containsKey(entry.getKey()),"Retired ability excluded from kit/creative");
             }
             near(h,p.getHealth(),40,"Retired remedy cannot heal");
@@ -66,6 +108,8 @@ public final class ThidaGameTests {
     public static void nonOriginRejects(GameTestHelper h) {
         run(h, f -> {
             FakePlayer p = f.player(false);
+            p.addTag("thida_origin");
+            h.assertTrue(!ThidaEvents.isThida(p), "A leftover scoreboard tag cannot grant the actual Thida Origin");
             p.setHealth(40);
             p.addEffect(new MobEffectInstance(MobEffects.POISON, 200));
             for (String id : ThidaMod.ABILITIES.keySet()) {
@@ -90,52 +134,52 @@ public final class ThidaGameTests {
             target.setPos(owner.getX() + 5, owner.getY(), owner.getZ());
             float targetHealth = target.getHealth();
             AttackEntityEvent attack = new AttackEntityEvent(owner, target);
-            MinecraftForge.EVENT_BUS.post(attack);
+            NeoForge.EVENT_BUS.post(attack);
             h.assertTrue(state(owner).hasUUID("nilakan_doll")
                     && state(owner).getUUID("nilakan_doll").equals(target.getUUID()), "A direct attack attempt links Nilakan");
             near(h, target.getHealth(), targetHealth, "Linking does not require damage to be dealt");
 
             tick(owner);
-            near(h, owner.getAttributeValue(Attributes.MOVEMENT_SPEED), Attributes.MOVEMENT_SPEED.getDefaultValue() * 1.05,
+            near(h, owner.getAttributeValue(Attributes.MOVEMENT_SPEED), Attributes.MOVEMENT_SPEED.value().getDefaultValue() * 1.05,
                     "Active Nilakan grants 5% movement speed");
-            near(h, owner.getAttributeValue(Attributes.ATTACK_DAMAGE), Attributes.ATTACK_DAMAGE.getDefaultValue() * 1.05,
+            near(h, owner.getAttributeValue(Attributes.ATTACK_DAMAGE), Attributes.ATTACK_DAMAGE.value().getDefaultValue() * 1.05,
                     "Active Nilakan grants 5% melee damage");
 
             target.setPos(owner.getX() + 201, owner.getY(), owner.getZ());
             tick(owner);
             h.assertTrue(state(owner).hasUUID("nilakan_doll"), "Out of range pauses without deleting the bond");
-            near(h, owner.getAttributeValue(Attributes.MOVEMENT_SPEED), Attributes.MOVEMENT_SPEED.getDefaultValue(),
+            near(h, owner.getAttributeValue(Attributes.MOVEMENT_SPEED), Attributes.MOVEMENT_SPEED.value().getDefaultValue(),
                     "Paused Nilakan removes its movement bonus");
 
             target.setPos(owner.getX() + 5, owner.getY(), owner.getZ());
             tick(owner);
-            near(h, owner.getAttributeValue(Attributes.MOVEMENT_SPEED), Attributes.MOVEMENT_SPEED.getDefaultValue() * 1.05,
+            near(h, owner.getAttributeValue(Attributes.MOVEMENT_SPEED), Attributes.MOVEMENT_SPEED.value().getDefaultValue() * 1.05,
                     "Returning to range resumes the bonus");
 
             f.uuidIndex.remove(target.getUUID());
             tick(owner);
             h.assertTrue(state(owner).hasUUID("nilakan_doll"), "Target disconnect pauses without deleting the bond");
-            near(h, owner.getAttributeValue(Attributes.MOVEMENT_SPEED), Attributes.MOVEMENT_SPEED.getDefaultValue(),
+            near(h, owner.getAttributeValue(Attributes.MOVEMENT_SPEED), Attributes.MOVEMENT_SPEED.value().getDefaultValue(),
                     "Disconnected target pauses Nilakan bonuses");
             f.uuidIndex.put(target.getUUID(), target);
             tick(owner);
-            near(h, owner.getAttributeValue(Attributes.MOVEMENT_SPEED), Attributes.MOVEMENT_SPEED.getDefaultValue() * 1.05,
+            near(h, owner.getAttributeValue(Attributes.MOVEMENT_SPEED), Attributes.MOVEMENT_SPEED.value().getDefaultValue() * 1.05,
                     "Returning target resumes the bond");
 
             ThidaPassives.onOwnerUnavailable(owner);
             h.assertTrue(state(owner).hasUUID("nilakan_doll"), "Owner disconnect preserves its bond");
             tick(owner);
-            near(h, owner.getAttributeValue(Attributes.MOVEMENT_SPEED), Attributes.MOVEMENT_SPEED.getDefaultValue() * 1.05,
+            near(h, owner.getAttributeValue(Attributes.MOVEMENT_SPEED), Attributes.MOVEMENT_SPEED.value().getDefaultValue() * 1.05,
                     "Owner reconnect resumes the bond");
 
-            owner.removeTag("thida_origin");
+            selectOrigin(owner, "origins:human");
             ThidaPassives.originLost(owner);
             h.assertTrue(!state(owner).hasUUID("nilakan_doll"), "Losing the Thida Origin ends the bond");
-            near(h, owner.getAttributeValue(Attributes.MOVEMENT_SPEED), Attributes.MOVEMENT_SPEED.getDefaultValue(),
+            near(h, owner.getAttributeValue(Attributes.MOVEMENT_SPEED), Attributes.MOVEMENT_SPEED.value().getDefaultValue(),
                     "Origin loss removes the passive bonus");
 
-            owner.addTag("thida_origin");
-            MinecraftForge.EVENT_BUS.post(new AttackEntityEvent(owner, target));
+            selectOrigin(owner, "thida:thida");
+            NeoForge.EVENT_BUS.post(new AttackEntityEvent(owner, target));
             h.assertTrue(state(owner).hasUUID("nilakan_doll"), "Thida can establish another Nilakan bond");
             ThidaPassives.onToss(owner, owner.getMainHandItem());
             h.assertTrue(!state(owner).hasUUID("nilakan_doll"), "Tossing the linked doll ends its bond immediately");
@@ -148,7 +192,7 @@ public final class ThidaGameTests {
             FakePlayer narotraOwner = f.player(true), narotraTarget = f.player(false);
             ItemStack narotra = new ItemStack(ThidaMod.ABILITIES.get("narotra_doll").get());
             UUID narotraItemId = UUID.randomUUID();
-            narotra.getOrCreateTag().putUUID("thida_passive_instance", narotraItemId);
+            ThidaItemData.putUUID(narotra, "thida_passive_instance", narotraItemId);
             narotraOwner.setItemInHand(InteractionHand.MAIN_HAND, narotra);
             narotraTarget.setPos(narotraOwner.getX(), narotraOwner.getY(), narotraOwner.getZ() + 5);
             CompoundTag narotraState = state(narotraOwner);
@@ -171,7 +215,7 @@ public final class ThidaGameTests {
             FakePlayer nilakanOwner = f.player(true), nilakanTarget = f.player(false);
             ItemStack nilakan = new ItemStack(ThidaMod.ABILITIES.get("nilakan_doll").get());
             UUID nilakanItemId = UUID.randomUUID();
-            nilakan.getOrCreateTag().putUUID("thida_passive_instance", nilakanItemId);
+            ThidaItemData.putUUID(nilakan, "thida_passive_instance", nilakanItemId);
             nilakanOwner.setItemInHand(InteractionHand.MAIN_HAND, nilakan);
             nilakanTarget.setPos(nilakanOwner.getX() + 5, nilakanOwner.getY(), nilakanOwner.getZ());
             CompoundTag nilakanState = state(nilakanOwner);
@@ -191,13 +235,67 @@ public final class ThidaGameTests {
     }
 
     @GameTest(template = "empty")
+    public static void narotraRestoresActualIronManaWithoutStacking(GameTestHelper h) {
+        run(h, f -> {
+            if (!net.neoforged.fml.ModList.get().isLoaded("irons_spellbooks")) {
+                FakePlayer owner = f.player(true), target = f.player(false);
+                target.setPos(owner.getX(), owner.getY(), owner.getZ() + 5);
+                completeNarotra(owner, target, 1000);
+                h.assertTrue(state(owner).hasUUID("narotra_doll"), "Narotra still links without Iron's installed");
+                owner.addEffect(new MobEffectInstance(MobEffects.POISON, 100));
+                ThidaPassives.tickAt(owner, state(owner), 1001);
+                h.assertTrue(!owner.hasEffect(MobEffects.POISON), "Narotra still cleanses without Iron's or any particle adapter");
+                return;
+            }
+            FakePlayer owner = f.player(true), target = f.player(false), anotherOwner = f.player(true);
+            var maxMana = BuiltInRegistries.ATTRIBUTE.getHolder(ResourceLocation.fromNamespaceAndPath("irons_spellbooks", "max_mana")).orElseThrow();
+            owner.getAttribute(maxMana).setBaseValue(250);
+            target.getAttribute(maxMana).setBaseValue(400);
+            anotherOwner.getAttribute(maxMana).setBaseValue(200);
+            var ownerMana = io.redspace.ironsspellbooks.api.magic.MagicData.getPlayerMagicData(owner);
+            var targetMana = io.redspace.ironsspellbooks.api.magic.MagicData.getPlayerMagicData(target);
+            var anotherMana = io.redspace.ironsspellbooks.api.magic.MagicData.getPlayerMagicData(anotherOwner);
+            ownerMana.setMana(0); targetMana.setMana(0); anotherMana.setMana(0);
+            target.setPos(owner.getX(), owner.getY(), owner.getZ() + 5);
+            completeNarotra(owner, target, 1000);
+            near(h, ownerMana.getMana(), 12.5, "Narotra immediately restores 5% of Thida's actual Iron Max Mana");
+            near(h, targetMana.getMana(), 20, "Narotra immediately restores 5% of its target's own Max Mana");
+            ThidaPassives.tickAt(owner, state(owner), 1399);
+            near(h, targetMana.getMana(), 20, "Narotra waits the full 20 seconds");
+            ThidaPassives.tickAt(owner, state(owner), 1400);
+            near(h, ownerMana.getMana(), 25, "Narotra restores Thida again at 20 seconds");
+            near(h, targetMana.getMana(), 40, "Narotra restores its target again at 20 seconds");
+            anotherOwner.setPos(owner.getX(), owner.getY(), owner.getZ());
+            completeNarotra(anotherOwner, target, 1400);
+            near(h, anotherMana.getMana(), 10, "A second Thida gets its own first restoration");
+            near(h, targetMana.getMana(), 40, "Two Narotra sources do not stack the target's mana rate");
+            ownerMana.setMana(249); targetMana.setMana(399);
+            ThidaPassives.tickAt(owner, state(owner), 1800);
+            near(h, ownerMana.getMana(), 250, "Thida mana is capped at Max Mana");
+            near(h, targetMana.getMana(), 400, "Target mana is capped at Max Mana");
+        });
+    }
+
+    private static void completeNarotra(FakePlayer owner, FakePlayer target, long time) {
+        ItemStack doll = new ItemStack(ThidaMod.ABILITIES.get("narotra_doll").get());
+        UUID token = UUID.randomUUID();
+        ThidaItemData.putUUID(doll, "thida_passive_instance", token);
+        owner.setItemInHand(InteractionHand.MAIN_HAND, doll);
+        owner.setYRot(0); owner.setXRot(0);
+        state(owner).putUUID("gazeTarget", target.getUUID());
+        state(owner).putUUID("passive_gaze_item", token);
+        state(owner).putInt("gaze", 199);
+        ThidaPassives.tickAt(owner, state(owner), time);
+    }
+
+    @GameTest(template = "empty")
     public static void covenantBlocksRecipientAttackAndHealing(GameTestHelper h) {
         run(h, f -> {
             FakePlayer owner = f.player(true), target = f.player(false), victim = f.player(false);
             state(owner).putUUID("heart", target.getUUID());
             target.setHealth(40);
-            LivingAttackEvent attack = new LivingAttackEvent(victim, victim.damageSources().playerAttack(target), 4);
-            MinecraftForge.EVENT_BUS.post(attack);
+            LivingIncomingDamageEvent attack = incoming(victim, victim.damageSources().playerAttack(target), 4);
+            NeoForge.EVENT_BUS.post(attack);
             h.assertTrue(attack.isCanceled(), "Covenant recipient's attack must be canceled on Forge bus");
             target.heal(5);
             near(h, target.getHealth(), 40, "Ordinary healing must be blocked");
@@ -213,7 +311,7 @@ public final class ThidaGameTests {
             FakePlayer owner = f.player(true), target = f.player(false);
             state(owner).putUUID("heart", target.getUUID());
             state(owner).putBoolean("heartUsed", true);
-            MinecraftForge.EVENT_BUS.post(new LivingDamageEvent(owner, owner.damageSources().generic(), 4));
+            NeoForge.EVENT_BUS.post(damageEvent(owner, owner.damageSources().generic(), 4));
             h.assertTrue(!state(owner).hasUUID("heart") && !state(owner).contains("heartUsed"), "Owner damage must clear covenant");
             h.assertTrue(state(owner).getLong("bleed") > owner.level().getGameTime(), "Owner damage must start bleed");
         });
@@ -241,7 +339,7 @@ public final class ThidaGameTests {
             state(owner).putUUID("heart", recipient.getUUID());
             state(owner).putBoolean("heartUsed", true);
             recipient.setHealth(40);
-            MobEffects.HEAL.applyInstantenousEffect(caster, caster, recipient, 0, 1.0);
+            MobEffects.HEAL.value().applyInstantenousEffect(caster, caster, recipient, 0, 1.0);
             near(h, recipient.getHealth(), 44, "External vanilla instant health");
             h.assertTrue(!state(owner).contains("heart") && !state(owner).contains("heartUsed"), "External vanilla instant health must release covenant");
         });
@@ -253,7 +351,7 @@ public final class ThidaGameTests {
             FakePlayer owner = f.player(true), recipient = f.player(false);
             state(owner).putUUID("heart", recipient.getUUID());
             recipient.setHealth(40);
-            MobEffects.HEAL.applyInstantenousEffect(recipient, recipient, recipient, 0, 1.0);
+            MobEffects.HEAL.value().applyInstantenousEffect(recipient, recipient, recipient, 0, 1.0);
             near(h, recipient.getHealth(), 40, "Self vanilla instant health must be blocked");
             h.assertTrue(state(owner).hasUUID("heart"), "Self vanilla instant health must retain covenant");
         });
@@ -267,7 +365,7 @@ public final class ThidaGameTests {
             state(owner).putBoolean("heartUsed", true);
             recipient.setHealth(40);
             recipient.addEffect(new MobEffectInstance(MobEffects.REGENERATION, 200), caster);
-            MobEffects.REGENERATION.applyEffectTick(recipient, 0);
+            MobEffects.REGENERATION.value().applyEffectTick(recipient, 0);
             near(h, recipient.getHealth(), 41, "External vanilla regeneration tick");
             h.assertTrue(!state(owner).contains("heart") && !state(owner).contains("heartUsed"), "External vanilla regeneration must release covenant");
         });
@@ -280,7 +378,7 @@ public final class ThidaGameTests {
             state(owner).putUUID("heart", recipient.getUUID());
             recipient.setHealth(40);
             recipient.addEffect(new MobEffectInstance(MobEffects.REGENERATION, 200), recipient);
-            MobEffects.REGENERATION.applyEffectTick(recipient, 0);
+            MobEffects.REGENERATION.value().applyEffectTick(recipient, 0);
             near(h, recipient.getHealth(), 40, "Self vanilla regeneration must be blocked");
             h.assertTrue(state(owner).hasUUID("heart"), "Self vanilla regeneration must retain covenant");
         });
@@ -324,8 +422,8 @@ public final class ThidaGameTests {
             FakePlayer p = f.player(true);
             near(h, ThidaConfig.DOMAIN_REDUCTION.get(), 0.7, "Test requires default domain reduction");
             use(h, p, "domain_talisman");
-            LivingHurtEvent event = new LivingHurtEvent(p, p.damageSources().generic(), 10);
-            MinecraftForge.EVENT_BUS.post(event);
+            LivingIncomingDamageEvent event = incoming(p, p.damageSources().generic(), 10);
+            NeoForge.EVENT_BUS.post(event);
             near(h, event.getAmount(), 3, "Domain must multiply incoming damage by .3");
         });
     }
@@ -336,12 +434,12 @@ public final class ThidaGameTests {
             FakePlayer owner = f.player(true), target = f.player(false);
             owner.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(ThidaMod.ABILITIES.get("nilakan_doll").get()));
             target.setPos(owner.getX() + 5, owner.getY(), owner.getZ());
-            MinecraftForge.EVENT_BUS.post(new AttackEntityEvent(owner, target));
+            NeoForge.EVENT_BUS.post(new AttackEntityEvent(owner, target));
             h.assertTrue(state(owner).hasUUID("nilakan_doll"), "Nilakan links on a direct attack attempt");
             tick(owner);
-            near(h, owner.getAttributeValue(Attributes.MOVEMENT_SPEED), Attributes.MOVEMENT_SPEED.getDefaultValue() * 1.05,
+            near(h, owner.getAttributeValue(Attributes.MOVEMENT_SPEED), Attributes.MOVEMENT_SPEED.value().getDefaultValue() * 1.05,
                     "Nilakan grants 5% movement speed");
-            near(h, owner.getAttributeValue(Attributes.ATTACK_DAMAGE), Attributes.ATTACK_DAMAGE.getDefaultValue() * 1.05,
+            near(h, owner.getAttributeValue(Attributes.ATTACK_DAMAGE), Attributes.ATTACK_DAMAGE.value().getDefaultValue() * 1.05,
                     "Nilakan grants 5% melee damage");
             h.assertTrue(!target.hasEffect(MobEffects.BLINDNESS) && !target.hasEffect(MobEffects.WEAKNESS), "Nilakan link does not cast active curses");
         });
@@ -352,16 +450,20 @@ public final class ThidaGameTests {
         run(h, f -> {
             FakePlayer p = f.player(false);
             h.assertTrue(ThidaMod.ABILITIES.size() == 5, "Only the five current abilities register as active");
-            ThidaMod.ABILITIES.forEach((id, item) -> h.assertTrue(item.isPresent()
-                    && ForgeRegistries.ITEMS.getValue(new ResourceLocation("thida", id)) == item.get(), "Missing item " + id));
+            ThidaMod.ABILITIES.forEach((id, item) -> h.assertTrue(item.get() != null
+                    && BuiltInRegistries.ITEM.get(ResourceLocation.fromNamespaceAndPath("thida", id)) == item.get(), "Missing item " + id));
             var server = p.server;
-            try (var reader = server.getResourceManager().getResource(new ResourceLocation("thida", "origins/thida.json"))
+            var selectedLayer = com.iafenvoy.origins.attachment.OriginDataHolder.get(p).getOrigins().keySet().iterator().next();
+            var options = selectedLayer.value().collectOrigins(p).map(option -> option.unwrapKey().orElseThrow().location()).toList();
+            h.assertTrue(options.contains(ThidaOrigins.THIDA), "Thida is available in the actual Origin selection layer");
+            h.assertTrue(options.contains(ResourceLocation.fromNamespaceAndPath("origins", "human")), "The selection layer preserves built-in Origins");
+            try (var reader = server.getResourceManager().getResource(ResourceLocation.fromNamespaceAndPath("thida", "origins/origin/thida.json"))
                     .orElseThrow().openAsReader()) {
                 var origin = JsonParser.parseReader(reader).getAsJsonObject();
                 h.assertTrue(origin.getAsJsonArray("powers").size() > 0, "Origin must declare powers");
                 for (var power : origin.getAsJsonArray("powers")) {
-                    ResourceLocation id = new ResourceLocation(power.getAsString());
-                    h.assertTrue(server.getResourceManager().getResource(new ResourceLocation(id.getNamespace(), "powers/" + id.getPath() + ".json")).isPresent(), "Missing power " + id);
+                    ResourceLocation id = ResourceLocation.parse(power.getAsString());
+                    h.assertTrue(server.getResourceManager().getResource(ResourceLocation.fromNamespaceAndPath(id.getNamespace(), "origins/power/" + id.getPath() + ".json")).isPresent(), "Missing power " + id);
                 }
             } catch (Exception e) { throw new AssertionError("Origin resource must load", e); }
             try {
@@ -393,9 +495,9 @@ public final class ThidaGameTests {
             target.hurt(target.damageSources().generic(), 100);
             near(h, target.getHealth(), 1, "Protected damage must be canceled");
             state(target).putLong("invulnerable", 0);
-            LivingDamageEvent after = new LivingDamageEvent(target, target.damageSources().generic(), 2);
-            MinecraftForge.EVENT_BUS.post(after);
-            near(h, after.getAmount(), 2, "Consumed covenant cannot save a second time");
+            LivingDamageEvent.Pre after = damageEvent(target, target.damageSources().generic(), 2);
+            NeoForge.EVENT_BUS.post(after);
+            near(h, after.getNewDamage(), 2, "Consumed covenant cannot save a second time");
         });
     }
 
@@ -405,19 +507,19 @@ public final class ThidaGameTests {
             FakePlayer owner = f.player(true), target = f.player(false);
             owner.setItemInHand(InteractionHand.OFF_HAND, new ItemStack(ThidaMod.ABILITIES.get("nilakan_doll").get()));
             target.setPos(owner.getX() + 5, owner.getY(), owner.getZ());
-            MinecraftForge.EVENT_BUS.post(new AttackEntityEvent(owner, target));
+            NeoForge.EVENT_BUS.post(new AttackEntityEvent(owner, target));
             h.assertTrue(!state(owner).hasUUID("narotra_doll") && state(owner).hasUUID("nilakan_doll"), "Nilakan links on attack while Narotra requires gaze");
             UUID nilakanItem = state(owner).getUUID("passive_nilakan_item");
             owner.setItemInHand(InteractionHand.OFF_HAND, ItemStack.EMPTY);
             ItemStack nilakanInventory = new ItemStack(ThidaMod.ABILITIES.get("nilakan_doll").get());
-            nilakanInventory.getOrCreateTag().putUUID("thida_passive_instance", nilakanItem);
+            ThidaItemData.putUUID(nilakanInventory, "thida_passive_instance", nilakanItem);
             owner.getInventory().add(nilakanInventory);
             ItemStack narotra = new ItemStack(ThidaMod.ABILITIES.get("narotra_doll").get());
-            UUID narotraItem = UUID.randomUUID(); narotra.getOrCreateTag().putUUID("thida_passive_instance", narotraItem);
+            UUID narotraItem = UUID.randomUUID(); ThidaItemData.putUUID(narotra, "thida_passive_instance", narotraItem);
             owner.getInventory().add(narotra);
             state(owner).putUUID("narotra_doll", target.getUUID());
             state(owner).putUUID("passive_narotra_item", narotraItem);
-            MinecraftForge.EVENT_BUS.post(new TickEvent.PlayerTickEvent(TickEvent.Phase.END, owner));
+            NeoForge.EVENT_BUS.post(new PlayerTickEvent.Post(owner));
             h.assertTrue(state(owner).hasUUID("narotra_doll") && state(owner).hasUUID("nilakan_doll"), "Hand changes must preserve both marks");
             h.assertTrue(state(owner).getUUID("passive_nilakan_item").equals(nilakanItem), "Nilakan instance survives hand changes when stored in inventory");
         });
@@ -449,10 +551,10 @@ public final class ThidaGameTests {
             state(owner).putUUID("parasite", target.getUUID());
             owner.hurt(owner.damageSources().generic(), 12);
             h.assertTrue(!state(owner).hasUUID("parasite"), "Bond breaks below 25 caster HP");
-            MinecraftForge.EVENT_BUS.post(new TickEvent.PlayerTickEvent(TickEvent.Phase.END, owner));
+            NeoForge.EVENT_BUS.post(new PlayerTickEvent.Post(owner));
             near(h, owner.getHealth(), 74, "Owner must gain fifty HP after pending damage");
             near(h, target.getHealth(), 24, "Partner keeps its damage share");
-            MinecraftForge.EVENT_BUS.post(new TickEvent.PlayerTickEvent(TickEvent.Phase.END, owner));
+            NeoForge.EVENT_BUS.post(new PlayerTickEvent.Post(owner));
             near(h, owner.getHealth(), 74, "Reward cannot repeat next tick");
             h.assertTrue(target.hasEffect(MobEffects.DAMAGE_RESISTANCE) && target.hasEffect(MobEffects.MOVEMENT_SPEED), "Partner receives escape buffs");
         });
@@ -463,7 +565,7 @@ public final class ThidaGameTests {
         run(h, f -> {
             FakePlayer owner = f.player(true), target = f.player(false);
             state(owner).putUUID("parasite", target.getUUID());
-            MinecraftForge.EVENT_BUS.post(new PlayerEvent.PlayerLoggedOutEvent(target));
+            NeoForge.EVENT_BUS.post(new PlayerEvent.PlayerLoggedOutEvent(target));
             h.assertTrue(!state(owner).hasUUID("parasite") && !state(owner).getBoolean("parasiteReward"), "Disconnect clears bond without healing exploit");
         });
     }
@@ -508,7 +610,7 @@ public final class ThidaGameTests {
             FakePlayer owner = f.player(true), target = f.player(false);
             ItemStack doll = new ItemStack(ThidaMod.ABILITIES.get("narotra_doll").get());
             owner.setItemInHand(InteractionHand.MAIN_HAND, doll);
-            UUID itemId = UUID.randomUUID(); doll.getOrCreateTag().putUUID("thida_passive_instance", itemId);
+            UUID itemId = UUID.randomUUID(); ThidaItemData.putUUID(doll, "thida_passive_instance", itemId);
             state(owner).putUUID("narotra_doll", target.getUUID());
             state(owner).putUUID("passive_narotra_item", itemId);
             state(owner).putLong("passive_narotra_cleanse_at", 0);
@@ -555,8 +657,8 @@ public final class ThidaGameTests {
             }
             near(h, state(owner).getLong("cd_domain_talisman") - time, 30000, "Next cast is twenty-five minutes later");
             owner.setPos(owner.getX() + 40, owner.getY(), owner.getZ());
-            LivingHurtEvent hit = new LivingHurtEvent(owner, owner.damageSources().generic(), 10);
-            MinecraftForge.EVENT_BUS.post(hit);
+            LivingIncomingDamageEvent hit = incoming(owner, owner.damageSources().generic(), 10);
+            NeoForge.EVENT_BUS.post(hit);
             near(h, hit.getAmount(), 10, "Domain must not follow caster");
             state(owner).putLong("domain", time);
             tick(owner);
@@ -582,11 +684,11 @@ public final class ThidaGameTests {
             for (String key : new String[]{"weakUntil", "slow", "bleed", "vulnerableUntil"})
                 near(h, state(victim).getLong(key)-now, 400, "Domain duration: " + key);
             near(h, victim.getAttributeValue(Attributes.ATTACK_SPEED), 2, "Domain halves attack speed");
-            var incoming = new LivingHurtEvent(victim, victim.damageSources().generic(), 10);
-            MinecraftForge.EVENT_BUS.post(incoming);
+            var incoming = incoming(victim, victim.damageSources().generic(), 10);
+            NeoForge.EVENT_BUS.post(incoming);
             near(h, incoming.getAmount(), 10*(1+ThidaConfig.VULNERABILITY.get()), "Domain vulnerability increases incoming damage");
-            var outgoing = new LivingHurtEvent(marked, marked.damageSources().playerAttack(victim), 10);
-            MinecraftForge.EVENT_BUS.post(outgoing);
+            var outgoing = incoming(marked, marked.damageSources().playerAttack(victim), 10);
+            NeoForge.EVENT_BUS.post(outgoing);
             near(h, outgoing.getAmount(), 7, "Domain weakness reduces outgoing damage");
         });
     }
@@ -599,10 +701,10 @@ public final class ThidaGameTests {
             owner.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(ThidaMod.ABILITIES.get("nilakan_doll").get()));
             replacement.hurt(replacement.damageSources().playerAttack(owner), 2);
             h.assertTrue(state(owner).getUUID("nilakan_doll").equals(target.getUUID()), "Cannot replace linked target without cancellation");
-            MinecraftForge.EVENT_BUS.post(new PlayerEvent.PlayerLoggedOutEvent(target));
+            NeoForge.EVENT_BUS.post(new PlayerEvent.PlayerLoggedOutEvent(target));
             tick(owner);
             h.assertTrue(state(owner).hasUUID("nilakan_doll"), "Target logout does not erase permanent mark");
-            MinecraftForge.EVENT_BUS.post(new PlayerEvent.PlayerLoggedOutEvent(owner));
+            NeoForge.EVENT_BUS.post(new PlayerEvent.PlayerLoggedOutEvent(owner));
             h.assertTrue(state(owner).hasUUID("nilakan_doll"), "Owner logout preserves permanent mark");
         });
     }
@@ -785,8 +887,21 @@ public final class ThidaGameTests {
         } finally { ThidaDomainState.clear(); }
     }
 
+    private static LivingIncomingDamageEvent incoming(net.minecraft.world.entity.LivingEntity entity, DamageSource source, float amount) {
+        return new LivingIncomingDamageEvent(entity, new DamageContainer(source, amount));
+    }
+    private static LivingDamageEvent.Pre damageEvent(net.minecraft.world.entity.LivingEntity entity, DamageSource source, float amount) {
+        return new LivingDamageEvent.Pre(entity, new DamageContainer(source, amount));
+    }
+    private static void selectOrigin(ServerPlayer player, String id) {
+        var layerKey = net.minecraft.resources.ResourceKey.<com.iafenvoy.origins.data.layer.Layer>createRegistryKey(ResourceLocation.fromNamespaceAndPath("origins", "layer"));
+        var originKey = net.minecraft.resources.ResourceKey.<com.iafenvoy.origins.data.origin.Origin>createRegistryKey(ResourceLocation.fromNamespaceAndPath("origins", "origin"));
+        var layer = player.registryAccess().registryOrThrow(layerKey).getHolderOrThrow(net.minecraft.resources.ResourceKey.create(layerKey, ResourceLocation.fromNamespaceAndPath("origins", "origin")));
+        var origin = player.registryAccess().registryOrThrow(originKey).getHolderOrThrow(net.minecraft.resources.ResourceKey.create(originKey, ResourceLocation.parse(id)));
+        com.iafenvoy.origins.attachment.OriginDataHolder.get(player).setOrigin(layer, origin);
+    }
     private static void tick(ServerPlayer p) {
-        MinecraftForge.EVENT_BUS.post(new TickEvent.PlayerTickEvent(TickEvent.Phase.END, p));
+        NeoForge.EVENT_BUS.post(new PlayerTickEvent.Post(p));
     }
 
     private static CompoundTag state(ServerPlayer p) {
@@ -829,9 +944,9 @@ public final class ThidaGameTests {
         Fixture(GameTestHelper helper) {
             this.helper = helper;
             uuidIndex = ObfuscationReflectionHelper.getPrivateValue(PlayerList.class,
-                    helper.getLevel().getServer().getPlayerList(), "f_11197_");
+                    helper.getLevel().getServer().getPlayerList(), "playersByUUID");
             serverPlayers = ObfuscationReflectionHelper.getPrivateValue(PlayerList.class,
-                    helper.getLevel().getServer().getPlayerList(), "f_11196_");
+                    helper.getLevel().getServer().getPlayerList(), "players");
             try {
                 Field field = FakePlayerFactory.class.getDeclaredField("fakePlayers");
                 field.setAccessible(true);
@@ -850,14 +965,15 @@ public final class ThidaGameTests {
             FakePlayer p = FakePlayerFactory.get(level, profile);
             players.add(p);
             helper.assertTrue(p == combat, "Factory must resolve combat fixture");
-            ObfuscationReflectionHelper.setPrivateValue(ServerPlayer.class, p, 0, "f_8921_");
+            ObfuscationReflectionHelper.setPrivateValue(ServerPlayer.class, p, 0, "spawnInvulnerableTime");
             p.getAttribute(Attributes.MAX_HEALTH).setBaseValue(100);
-            p.getAttribute(Attributes.MOVEMENT_SPEED).setBaseValue(Attributes.MOVEMENT_SPEED.getDefaultValue());
-            p.getAttribute(Attributes.ATTACK_DAMAGE).setBaseValue(Attributes.ATTACK_DAMAGE.getDefaultValue());
+            p.getAttribute(Attributes.MOVEMENT_SPEED).setBaseValue(Attributes.MOVEMENT_SPEED.value().getDefaultValue());
+            p.getAttribute(Attributes.ATTACK_DAMAGE).setBaseValue(Attributes.ATTACK_DAMAGE.value().getDefaultValue());
             p.setHealth(100);
             BlockPos pos = helper.absolutePos(BlockPos.ZERO);
-            p.setPos(pos.getX() + .5, pos.getY() + 1, pos.getZ() + .5);
-            if (origin) p.addTag("thida_origin");
+            // 1.21.1 places test templates near the world's floor. Keep gaze rays above surrounding terrain.
+            p.setPos(pos.getX() + .5, pos.getY() + 12, pos.getZ() + .5);
+            selectOrigin(p, origin ? "thida:thida" : "origins:human");
             serverPlayers.add(p);
             uuidIndex.put(uuid, p);
             helper.assertTrue(level.getServer().getPlayerList().getPlayer(uuid) == p, "UUID resolution must find loaded fixture");

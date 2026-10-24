@@ -2,8 +2,7 @@
   "required": true,
   "minVersion": "0.8",
   "package": "dev.thida.mixin",
-  "compatibilityLevel": "JAVA_17",
-  "refmap": "thida.refmap.json",
-  "mixins": ["HealingEffectMixin", "RegenerationSourceMixin"],
+  "compatibilityLevel": "JAVA_21",
+  "mixins": ["HealingEffectMixin", "RegenerationSourceMixin", "RegenerationHealingMixin", "AdvancedFakePlayerConnectionMixin", "AdvancedFakePlayerStartupMixin"],
   "injectors": {"defaultRequire": 1}
 }

@@ -7,20 +7,20 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemStack;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.client.event.RegisterKeyMappingsEvent;
-import net.minecraftforge.client.settings.KeyConflictContext;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
+import net.neoforged.neoforge.client.settings.KeyConflictContext;
+import net.neoforged.neoforge.client.event.ClientTickEvent;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.EventBusSubscriber;
 import org.lwjgl.glfw.GLFW;
 
 /** Client-only entry point: the server never loads Minecraft or Screen classes. */
-@Mod.EventBusSubscriber(modid = "thida", value = Dist.CLIENT)
+@EventBusSubscriber(modid = "thida", value = Dist.CLIENT)
 public final class ThidaClient {
     public static final KeyMapping OPEN_MENU = new KeyMapping("key.thida.open_doll_menu",
             KeyConflictContext.IN_GAME, InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_R, "key.categories.thida");
-    @Mod.EventBusSubscriber(modid = "thida", value = Dist.CLIENT, bus = Mod.EventBusSubscriber.Bus.MOD)
+    @EventBusSubscriber(modid = "thida", value = Dist.CLIENT, bus = EventBusSubscriber.Bus.MOD)
     public static final class KeyRegistration {
         @SubscribeEvent public static void register(RegisterKeyMappingsEvent event) { event.register(OPEN_MENU); }
     }
@@ -29,9 +29,24 @@ public final class ThidaClient {
                 || stack.is(ThidaMod.ABILITIES.get("narotra_doll").get());
     }
     @SubscribeEvent
-    public static void key(TickEvent.ClientTickEvent event) {
-        if (event.phase != TickEvent.Phase.START) return;
+    public static void key(ClientTickEvent.Pre event) {
         while (OPEN_MENU.consumeClick()) openMenu();
+    }
+    @SubscribeEvent(priority = net.neoforged.bus.api.EventPriority.HIGH)
+    public static void tooltip(net.neoforged.neoforge.event.entity.player.ItemTooltipEvent event) {
+        String item = ThidaEvents.id(event.getItemStack());
+        if (!ThidaTooltips.passive(item) || !Screen.hasShiftDown()) return;
+        var lines = event.getToolTip();
+        for (int i = 0; i < lines.size(); i++) {
+            if (lines.get(i).getContents() instanceof net.minecraft.network.chat.contents.TranslatableContents text
+                    && text.getKey().equals(ThidaTooltips.MORE)) {
+                lines.remove(i);
+                var details = new java.util.ArrayList<Component>();
+                ThidaTooltips.appendDetails(item, details);
+                lines.addAll(i, details);
+                return;
+            }
+        }
     }
     private static void openMenu() {
         Minecraft mc = Minecraft.getInstance();
@@ -44,7 +59,7 @@ public final class ThidaClient {
             while (mapping.consumeClick()) { }
             mapping.setDown(false);
         }
-        ThidaNetwork.CHANNEL.sendToServer(new ThidaNetwork.DollAction(1));
+        net.neoforged.neoforge.network.PacketDistributor.sendToServer(new ThidaNetwork.DollAction(1));
         mc.setScreen(new DollScreen(held.is(ThidaMod.ABILITIES.get("narotra_doll").get())));
     }
     private static final class DollScreen extends Screen {
@@ -72,19 +87,19 @@ public final class ThidaClient {
             boolean linked=!data.getCompound(item).getString("id").isEmpty();
             SkillButton button=buttons.get(0);
             button.active=data.getBoolean("thida")&&linked;
-            button.status=!data.getBoolean("thida")?"ต้องเลือก Origin ธิดา":!linked?"ยังไม่มีสายสัมพันธ์":button.description;
+            button.status=!data.getBoolean("thida")?"ต้องเลือกเผ่ากำเนิดธิดา":!linked?"ยังไม่มีสายสัมพันธ์":button.description;
         }
         private void choose(int button) {
             refresh();
             if(button!=1||!buttons.get(0).active) return;
-            ThidaNetwork.CHANNEL.sendToServer(new ThidaNetwork.DollAction(5)); onClose();
+            net.neoforged.neoforge.network.PacketDistributor.sendToServer(new ThidaNetwork.DollAction(5)); onClose();
         }
         @Override public boolean keyPressed(int key,int scan,int modifiers) {
             if(key==GLFW.GLFW_KEY_1) { choose(1); return true; }
             return super.keyPressed(key,scan,modifiers);
         }
         @Override public void render(GuiGraphics graphics,int mouseX,int mouseY,float partialTick) {
-            renderBackground(graphics); refresh();
+            renderBackground(graphics, mouseX, mouseY, partialTick); refresh();
             int accent=blessing?0xFF91DAC2:0xFFD3A4EC;
             ThidaGui.frame(graphics,left,top,272,150,accent,true);
             ThidaGui.icon(graphics,blessing?"narotra":"nilakan",left+10,top+6,2);

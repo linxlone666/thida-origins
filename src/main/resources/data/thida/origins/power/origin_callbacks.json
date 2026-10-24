@@ -1,0 +1,20 @@
+{
+  "type": "origins:action_on_callback",
+  "hidden": true,
+  "entity_action_gained": {
+    "type": "origins:execute_command",
+    "command": "tag @s add thida_origin"
+  },
+  "entity_action_added": {
+    "type": "origins:execute_command",
+    "command": "tag @s add thida_origin"
+  },
+  "entity_action_respawned": {
+    "type": "origins:execute_command",
+    "command": "tag @s add thida_origin"
+  },
+  "entity_action_lost": {
+    "type": "origins:execute_command",
+    "command": "tag @s remove thida_origin"
+  }
+}

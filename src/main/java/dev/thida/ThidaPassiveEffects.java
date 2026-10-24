@@ -4,7 +4,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.phys.Vec3;
-import net.minecraftforge.network.PacketDistributor;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 /** Server-to-client, privacy-minimal event dispatcher for future passive visuals. */
 public final class ThidaPassiveEffects {
@@ -27,9 +27,9 @@ public final class ThidaPassiveEffects {
         packet.putString("hand", hand == null ? "" : hand.name());
         packet.putString("reason", reason == null ? "" : reason);
         ThidaNetwork.PassiveEffectEvent message = new ThidaNetwork.PassiveEffectEvent(packet);
-        if (!(owner instanceof net.minecraftforge.common.util.FakePlayer))
-            ThidaNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> owner), message);
-        if (target != null && target != owner && target.isAlive() && !(target instanceof net.minecraftforge.common.util.FakePlayer))
-            ThidaNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> target), message);
+        if (!(owner instanceof net.neoforged.neoforge.common.util.FakePlayer))
+            net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(owner, message);
+        if (target != null && target != owner && target.isAlive() && !(target instanceof net.neoforged.neoforge.common.util.FakePlayer))
+            net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(target, message);
     }
 }

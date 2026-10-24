@@ -1,0 +1,13 @@
+{
+  "version": "0.6.5-neoforge-dev",
+  "tag": "v0.6.5-neoforge-dev",
+  "reconstructed_history": true,
+  "source_snapshot_available": true,
+  "checked_out_source_snapshot": "0.6.5-neoforge-dev",
+  "source_snapshot_label": "thida-before-skills-0.7-20261018.zip",
+  "source_archive_sha256": "87b69fb6bd59937fd7ab644ce356453c27eb2d1febd70de6c12dff56b5ccb8f2",
+  "artifact": "thida-origins-1.21.1-neoforge-0.6.5-neoforge-dev.jar",
+  "artifact_sha256": "1572ecfb9aeec64e34d9fef35d1bd68b336b4b6a3c6029998c43d10ae320186a",
+  "summary": "Recover NeoForge port, crash fixes, Thai UI and tooltip source",
+  "note": "Recovered source snapshot, not an original historical Git commit. Source and binary were not rebuilt to claim reproducible correspondence."
+}

@@ -6,14 +6,14 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.client.event.ClientPlayerNetworkEvent;
-import net.minecraftforge.client.event.RenderGuiEvent;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
+import net.neoforged.neoforge.client.event.RenderGuiEvent;
+import net.neoforged.neoforge.client.event.ClientTickEvent;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.EventBusSubscriber;
 
-@Mod.EventBusSubscriber(modid = "thida", value = Dist.CLIENT)
+@EventBusSubscriber(modid = "thida", value = Dist.CLIENT)
 public final class ThidaHud {
     private static final int WHITE = 0xFFF0E9DA, GREEN = 0xFF9DE7AD, RED = 0xFFFFACAC, GOLD = 0xFFFFD780;
     private static final String[] LINKS = {"nilakan_doll", "narotra_doll", "parasite", "heart"};
@@ -37,9 +37,9 @@ public final class ThidaHud {
         ThidaHudState.accept(new CompoundTag()); previous = null; revision = -1; noticeTicks = 0; previewUntil = 0;
     }
     @SubscribeEvent
-    public static void tick(TickEvent.ClientTickEvent event) {
+    public static void tick(ClientTickEvent.Post event) {
         Minecraft mc = Minecraft.getInstance();
-        if (event.phase != TickEvent.Phase.END || mc.player == null || mc.level == null || mc.isPaused()) return;
+        if (mc.player == null || mc.level == null || mc.isPaused()) return;
         ThidaHudState.tick();
         if (noticeTicks > 0) noticeTicks--;
         if (revision == ThidaHudState.revision()) return;
@@ -102,7 +102,7 @@ public final class ThidaHud {
     @SubscribeEvent
     public static void render(RenderGuiEvent.Post event) {
         Minecraft mc=Minecraft.getInstance();
-        if(mc.player==null||mc.options.hideGui||mc.options.renderDebug||mc.screen!=null||!ThidaHudConfig.VISIBLE.get()) return;
+        if(mc.player==null||mc.options.hideGui||mc.getDebugOverlay().showDebugScreen()||mc.screen!=null||!ThidaHudConfig.VISIBLE.get()) return;
         CompoundTag data=ThidaHudState.snapshot();
         if(!data.getString("player").equals(mc.player.getUUID().toString())) return;
         List<Badge> badges=new ArrayList<>();
@@ -125,7 +125,7 @@ public final class ThidaHud {
                     !data.getCompound("heart").getString("id").isEmpty());
             add(badges,"domain","",ThidaHudState.remaining(data.getLong("domain")),ThidaGui.remaining(data,"cd_domain_talisman"),
                     data.getInt("domainTotal"),data.getInt("domainCooldownTotal"),false);
-            if(data.getInt("gaze")>0) add(badges,"narotra","G",Math.max(1,data.getInt("gazeRequired")-data.getInt("gaze")),0,data.getInt("gazeRequired"),0,false);
+            if(data.getInt("gaze")>0) add(badges,"narotra","จ",Math.max(1,data.getInt("gazeRequired")-data.getInt("gaze")),0,data.getInt("gazeRequired"),0,false);
         }
         if(!data.getString("guardian").isEmpty()) add(badges,"heart","",0,0,0,0,true);
         add(badges,"shield","!",ThidaHudState.remaining(data.getLong("invulnerable")),0,100,0,false);
@@ -133,9 +133,9 @@ public final class ThidaHud {
             // Local placement sample only: no real effect, cooldown or network state is changed.
             badges.clear();
             long left = previewUntil - mc.level.getGameTime();
-            add(badges,"speed","P",left+200,0,400,0,false);
-            add(badges,"domain","P",0,left,0,200,false);
-            add(badges,"heart","P",0,0,0,0,true);
+            add(badges,"speed","ท",left+200,0,400,0,false);
+            add(badges,"domain","ท",0,left,0,200,false);
+            add(badges,"heart","ท",0,0,0,0,true);
         }
         if(badges.isEmpty()) return;
         int sw=mc.getWindow().getGuiScaledWidth(), sh=mc.getWindow().getGuiScaledHeight();
@@ -152,7 +152,7 @@ public final class ThidaHud {
             ThidaGui.frame(g,bx,by,34,35,color,active);
             ThidaGui.icon(g,badge.icon(),bx+4,by+3,1);
             if(!active) g.fill(bx+4,by+3,bx+20,by+19,0x88211D2D);
-            if(!active) ThidaGui.text(g,"CD",bx+21,by+3,12,color);
+            if(!active) ThidaGui.text(g,"รอ",bx+21,by+3,12,color);
             if(!badge.key().isEmpty()) ThidaGui.text(g,badge.key(),bx+24,by+13,8,ThidaGui.MUTED);
             String timer=badge.sustained()?"∞":ThidaHudState.time(badge.ticks());
             int tx=bx+(34-mc.font.width(timer))/2;

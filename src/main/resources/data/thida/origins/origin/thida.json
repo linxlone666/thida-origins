@@ -1,0 +1,6 @@
+{
+  "icon": { "id": "minecraft:totem_of_undying" },
+  "impact": 3,
+  "order": 10,
+  "powers": ["thida:arts", "thida:origin_callbacks"]
+}

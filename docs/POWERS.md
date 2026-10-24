@@ -1,4 +1,6 @@
-# คู่มือพลังธิดา 0.5.5-mirror-debug
+# คู่มือพลังธิดา 0.6.1-neoforge-dev
+
+ย้ายระบบเป็น Minecraft 1.21.1 NeoForge แล้ว รายละเอียด Passive ปัจจุบันอยู่ใน [PASSIVES_TH.md](PASSIVES_TH.md) และรายละเอียดเวอร์ชัน/การติดตั้งอยู่ใน [MIGRATION_1_21_1_TH.md](MIGRATION_1_21_1_TH.md) รายละเอียดสกิลอื่นด้านล่างเป็นพฤติกรรมเดิมที่พอร์ตเพื่อความเข้ากันได้ และยังไม่ใช่ข้อกำหนดสกิลชุดใหม่ที่ยืนยันแล้ว
 
 รุ่น Debug ใช้พลังและ HUD แบบ Lite เพิ่มคำสั่งผู้ดูแล `/thida resetcooldown`, `/thida debug status` และ `/thida debug end` ดูวิธีทดลองและคำสั่งปรับตำแหน่ง HUD ใน README.md
 

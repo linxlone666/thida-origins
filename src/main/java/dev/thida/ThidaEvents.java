@@ -20,21 +20,21 @@ import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.item.ItemStack;
 
 import net.minecraft.world.phys.Vec3;
-import net.minecraftforge.event.TickEvent;
+import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 
-import net.minecraftforge.event.entity.living.LivingAttackEvent;
-import net.minecraftforge.event.entity.living.LivingDamageEvent;
-import net.minecraftforge.event.entity.living.LivingDeathEvent;
-import net.minecraftforge.event.entity.living.LivingHealEvent;
-import net.minecraftforge.event.entity.living.LivingHurtEvent;
-import net.minecraftforge.event.entity.player.PlayerEvent;
-import net.minecraftforge.event.entity.item.ItemTossEvent;
-import net.minecraftforge.eventbus.api.EventPriority;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.registries.ForgeRegistries;
+import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
+import net.neoforged.neoforge.event.entity.living.LivingDamageEvent;
+import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
+import net.neoforged.neoforge.event.entity.living.LivingHealEvent;
 
-/** Server-only mechanics. Origins integration must add/remove the thida_origin scoreboard tag.
+import net.neoforged.neoforge.event.entity.player.PlayerEvent;
+import net.neoforged.neoforge.event.entity.item.ItemTossEvent;
+import net.neoforged.bus.api.EventPriority;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.EventBusSubscriber;
+import net.minecraft.core.registries.BuiltInRegistries;
+
+/** Server-only mechanics. Origin permissions come from the selected Origin via ThidaOrigins.
  * Narotra and Nilakan bonds survive item swaps, death and disconnect; unavailable targets pause their passive effects.
  * Other bonds and cooldowns use their own lifecycle rules.
  * Bleed is one armor-bypassing HP/second; attack slowdown is a temporary attribute modifier.
@@ -44,16 +44,16 @@ import net.minecraftforge.registries.ForgeRegistries;
  * Domain hit debuffs focus on PvP. Weakening reduces all player-sourced damage by 30%;
  * vanilla Weakness additionally penalizes melee. Recipient absorption may absorb shared damage.
  */
-@Mod.EventBusSubscriber(modid = "thida")
+@EventBusSubscriber(modid = "thida")
 public final class ThidaEvents {
     private static final String ROOT = "thida_state";
-    private static final UUID SLOW = UUID.fromString("d33de0e3-8da7-4466-b42c-190f32effb2a");
+    private static final ResourceLocation SLOW = ResourceLocation.fromNamespaceAndPath("thida", "curse_attack_speed");
     private static boolean internalHeal;
     private static boolean transfer;
     private ThidaEvents() {}
 
     public static boolean isThida(ServerPlayer p) {
-        return p.getTags().contains("thida_origin");
+        return ThidaOrigins.isThida(p);
     }
 
     /** Callers must enforce operator permission; these methods do not change existing effects. */
@@ -88,18 +88,18 @@ public final class ThidaEvents {
     static long now(Entity e) { return e.level().getGameTime(); }
     private static int seconds() { return Math.max(1, ThidaConfig.EFFECT_SECONDS.get()) * 20; }
     static String id(ItemStack stack) {
-        ResourceLocation key = ForgeRegistries.ITEMS.getKey(stack.getItem());
+        ResourceLocation key = BuiltInRegistries.ITEM.getKey(stack.getItem());
         return key != null && key.getNamespace().equals("thida") ? key.getPath() : "";
     }
     static boolean holds(ServerPlayer p, String name) {
         return id(p.getMainHandItem()).equals(name) || id(p.getOffhandItem()).equals(name);
     }
-    private static void effect(LivingEntity e, MobEffect effect, int ticks, int amp) {
+    private static void effect(LivingEntity e, net.minecraft.core.Holder<MobEffect> effect, int ticks, int amp) {
         e.addEffect(new MobEffectInstance(effect, ticks, amp));
     }
     static void cleanse(LivingEntity e) {
         for (MobEffectInstance effect : new ArrayList<>(e.getActiveEffects()))
-            if (effect.getEffect().getCategory() == MobEffectCategory.HARMFUL)
+            if (effect.getEffect().value().getCategory() == MobEffectCategory.HARMFUL)
                 e.removeEffect(effect.getEffect());
         state(e).remove("bleed");
         state(e).remove("slow");
@@ -184,7 +184,7 @@ public final class ThidaEvents {
         data.put("activeEffects", activeEffects);
         return data;
     }
-    private static long effectTicks(ServerPlayer p, MobEffect effect) {
+    private static long effectTicks(ServerPlayer p, net.minecraft.core.Holder<MobEffect> effect) {
         MobEffectInstance instance = p.getEffect(effect);
         return instance == null ? 0 : instance.getDuration();
     }
@@ -208,8 +208,8 @@ public final class ThidaEvents {
         return Math.max(0, Math.min(remaining, actual));
     }
     private static void syncHud(ServerPlayer p) {
-        if (p.tickCount % 5 != 0 || p instanceof net.minecraftforge.common.util.FakePlayer) return;
-        ThidaNetwork.CHANNEL.send(net.minecraftforge.network.PacketDistributor.PLAYER.with(() -> p),
+        if (p.tickCount % 5 != 0 || p instanceof net.neoforged.neoforge.common.util.FakePlayer) return;
+        net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(p,
                 new ThidaNetwork.HudSnapshot(hudSnapshot(p)));
     }
     private static boolean covenant(ServerPlayer p) { return resolve(p, "heart") != null; }
@@ -285,7 +285,7 @@ public final class ThidaEvents {
         String cd = "cd_effect_" + item + "_" + mode;
         if (!dollsAllowed(p) || target == null || n.getLong("cd_" + item) > now(p)
                 || n.getLong(cd) > now(p)) {
-            tell(p, "ยังไม่มีเป้าหมาย หรือสกิลติดคูลดาวน์ / No target or cooldown"); return false;
+            tell(p, "ยังไม่มีเป้าหมาย หรือสกิลติดคูลดาวน์"); return false;
         }
         if (item.equals("narotra_doll")) blessing(p, target, mode);
         else curse(target, mode);
@@ -305,17 +305,17 @@ public final class ThidaEvents {
         if (covenant(p) && (passive(item) || item.equals("parasite_doll")))
             return InteractionResultHolder.fail(stack);
         if (passive(item) && !dollsAllowed(p)) {
-            tell(p, "Release the parasite bond first."); return InteractionResultHolder.fail(stack);
+            tell(p, "ยกเลิกสายสัมพันธ์กาฝากก่อน"); return InteractionResultHolder.fail(stack);
         }
         if (passive(item)) return InteractionResultHolder.pass(stack);
         if (n.getLong("cd_" + item) > now(p)) {
-            tell(p, "Ability is cooling down."); return InteractionResultHolder.fail(stack);
+            tell(p, "สกิลยังติดคูลดาวน์"); return InteractionResultHolder.fail(stack);
         }
         switch (item) {
             case "narotra_doll", "nilakan_doll" -> { return InteractionResultHolder.pass(stack); }
             case "parasite_doll" -> {
                 if (resolve(p, "parasite") != null || n.getBoolean("parasiteArmed")) {
-                    release(p, "parasite"); tell(p, "Parasite bond released.");
+                    release(p, "parasite"); tell(p, "ยกเลิกสายสัมพันธ์กาฝากแล้ว");
                 } else {
                     if (hasParasitePartner(p)) return InteractionResultHolder.fail(stack);
                     var doll = new net.minecraft.world.entity.decoration.ArmorStand(p.level(), p.getX(), p.getY(), p.getZ());
@@ -324,7 +324,7 @@ public final class ThidaEvents {
                     p.level().addFreshEntity(doll);
                     n.putUUID("parasiteEntity", doll.getUUID());
                     n.putBoolean("parasiteArmed", true);
-                    tell(p, "ตีเป้าหมายเพื่อเชื่อมหุ่นกาฝาก / Hit a player to link");
+                    tell(p, "โจมตีผู้เล่นเป้าหมายเพื่อเชื่อมหุ่นกาฝาก");
                 }
                 return InteractionResultHolder.success(stack);
             }
@@ -339,7 +339,7 @@ public final class ThidaEvents {
                 n.putUUID("heart", target.getUUID());
                 n.putString("heartName", target.getScoreboardName());
                 n.putBoolean("heartUsed", false);
-                tell(p, "Covenant bound to " + target.getScoreboardName());
+                tell(p, "พันธสัญญาหัวใจเชื่อมกับ " + target.getScoreboardName());
                 return InteractionResultHolder.success(stack);
             }
             case "domain_talisman" -> {
@@ -377,7 +377,7 @@ public final class ThidaEvents {
         state(p).putLong("slow", now(p) + duration);
         var attribute = p.getAttribute(Attributes.ATTACK_SPEED);
         if (attribute != null && attribute.getModifier(SLOW) == null)
-            attribute.addTransientModifier(new AttributeModifier(SLOW, "Thida curse", -0.5, AttributeModifier.Operation.MULTIPLY_TOTAL));
+            attribute.addTransientModifier(new AttributeModifier(SLOW, -0.5, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL));
     }
     private static boolean inDomain(ServerPlayer owner, Entity target) {
         return isThida(owner) && state(owner).getLong("domain") > now(owner)
@@ -389,7 +389,7 @@ public final class ThidaEvents {
         return new Vec3(n.getDouble("domainX"), n.getDouble("domainY"), n.getDouble("domainZ"));
     }
     @SubscribeEvent
-    public static void attack(LivingAttackEvent event) {
+    public static void attack(LivingIncomingDamageEvent event) {
         if (event.getEntity().level().isClientSide) return;
         if (state(event.getEntity()).getLong("invulnerable") > now(event.getEntity())) {
             event.setCanceled(true); return;
@@ -398,7 +398,7 @@ public final class ThidaEvents {
                 && event.getSource().getDirectEntity() == p && heartOwner(p) != null) event.setCanceled(true);
     }
     @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void hurt(LivingHurtEvent event) {
+    public static void hurt(LivingIncomingDamageEvent event) {
         if (!transfer && state(event.getEntity()).getLong("vulnerableUntil") > now(event.getEntity()))
             event.setAmount(event.getAmount() * (1 + ThidaConfig.VULNERABILITY.get().floatValue()));
         if (!transfer && event.getSource().getEntity() instanceof ServerPlayer attacker
@@ -408,16 +408,16 @@ public final class ThidaEvents {
             event.setAmount(CombatRules.domainDamage(event.getAmount(), 1 - ThidaConfig.DOMAIN_REDUCTION.get()));
     }
     @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void damage(LivingDamageEvent event) {
-        if (!(event.getEntity() instanceof ServerPlayer victim) || event.getAmount() <= 0) return;
-        if (state(victim).getLong("invulnerable") > now(victim)) { event.setAmount(0); return; }
+    public static void damage(LivingDamageEvent.Pre event) {
+        if (!(event.getEntity() instanceof ServerPlayer victim) || event.getNewDamage() <= 0) return;
+        if (state(victim).getLong("invulnerable") > now(victim)) { event.setNewDamage(0); return; }
         if (transfer) {
             ownerDamaged(victim);
-            event.setAmount(protect(victim, event.getAmount()));
+            event.setNewDamage(protect(victim, event.getNewDamage()));
             return;
         }
         if (event.getSource().getEntity() instanceof ServerPlayer attacker) {
-            if (heartOwner(attacker) != null && event.getSource().getDirectEntity() == attacker) { event.setAmount(0); return; }
+            if (heartOwner(attacker) != null && event.getSource().getDirectEntity() == attacker) { event.setNewDamage(0); return; }
             if (isThida(attacker)) {
                 boolean melee = event.getSource().getDirectEntity() == attacker;
                 if (melee && resolve(attacker, "parasite") == null) {
@@ -431,7 +431,7 @@ public final class ThidaEvents {
                         state(attacker).putBoolean("parasiteArmed", false);
                         effect(victim, MobEffects.MOVEMENT_SPEED, 200, 1);
                         effect(victim, MobEffects.DAMAGE_RESISTANCE, 200, 0);
-                        tell(attacker, "Parasite bound to " + victim.getScoreboardName());
+                        tell(attacker, "กาฝากเชื่อมกับ " + victim.getScoreboardName());
                     }
                 }
                 if (inDomain(attacker, victim)) {
@@ -449,7 +449,7 @@ public final class ThidaEvents {
             }
         }
         ownerDamaged(victim);
-        float amount = event.getAmount();
+        float amount = event.getNewDamage();
         for (ServerPlayer owner : victim.server.getPlayerList().getPlayers()) {
             ServerPlayer partner = resolve(owner, "parasite");
             if (partner == null || (owner != victim && partner != victim)) continue;
@@ -469,7 +469,7 @@ public final class ThidaEvents {
             }
             break;
         }
-        event.setAmount(protect(victim, amount));
+        event.setNewDamage(protect(victim, amount));
     }
     private static boolean hasParasitePartner(ServerPlayer p) {
         if (resolve(p, "parasite") != null) return true;
@@ -501,7 +501,7 @@ public final class ThidaEvents {
         transfer = true;
         try {
             var key = net.minecraft.resources.ResourceKey.create(net.minecraft.core.registries.Registries.DAMAGE_TYPE,
-                    new ResourceLocation("thida", "shared"));
+                    ResourceLocation.fromNamespaceAndPath("thida", "shared"));
             var type = p.level().registryAccess().registryOrThrow(net.minecraft.core.registries.Registries.DAMAGE_TYPE).getHolderOrThrow(key);
             p.hurt(new DamageSource(type, source.getDirectEntity(), source.getEntity()), amount);
         } finally { transfer = previousTransfer; }
@@ -511,8 +511,8 @@ public final class ThidaEvents {
         if (event.getEntity() instanceof ServerPlayer p && !internalHeal && heartOwner(p) != null) event.setCanceled(true);
     }
     @SubscribeEvent
-    public static void tick(TickEvent.PlayerTickEvent event) {
-        if (event.phase != TickEvent.Phase.END || !(event.player instanceof ServerPlayer p)) return;
+    public static void tick(PlayerTickEvent.Post event) {
+        if (!(event.getEntity() instanceof ServerPlayer p)) return;
         CompoundTag n = state(p);
         long time = now(p);
         if (n.getLong("slow") <= time && p.getAttribute(Attributes.ATTACK_SPEED) != null)
@@ -520,7 +520,7 @@ public final class ThidaEvents {
         if (n.getLong("bleed") > time && time % 20 == 0)
             p.hurt(p.damageSources().magic(), 1);
         if (!isThida(p)) {
-            if (n.getBoolean("active")) cleanup(p);
+            if (n.getBoolean("active") || n.hasUUID("narotra_doll") || n.hasUUID("nilakan_doll")) cleanup(p);
             syncHud(p);
             return;
         }
@@ -585,10 +585,10 @@ public final class ThidaEvents {
         packet.putDouble("radius", radius);
         packet.putLong("age", state.contains("domainStarted") ? now(p)-state.getLong("domainStarted") : 80);
         for (ServerPlayer observer : p.server.getPlayerList().getPlayers()) {
-            if (observer instanceof net.minecraftforge.common.util.FakePlayer) continue;
+            if (observer instanceof net.neoforged.neoforge.common.util.FakePlayer) continue;
             if (!active || observer.level().dimension().location().toString().equals(state.getString("domainDimension"))
                     && observer.position().distanceToSqr(c) <= Math.pow(radius + 96, 2)) {
-                ThidaNetwork.CHANNEL.send(net.minecraftforge.network.PacketDistributor.PLAYER.with(() -> observer),
+                net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(observer,
                         new ThidaNetwork.DomainSnapshot(packet));
             }
         }

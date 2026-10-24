@@ -2,20 +2,20 @@ package dev.thida;
 
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.Minecraft;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.client.event.ClientPlayerNetworkEvent;
-import net.minecraftforge.client.event.RenderLevelStageEvent;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
+import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
+import net.neoforged.neoforge.client.event.ClientTickEvent;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.EventBusSubscriber;
 import org.joml.Matrix4f;
 
 /** Additive, depth-tested world geometry: visible in daylight, no solid screen overlay. */
-@Mod.EventBusSubscriber(modid = "thida", value = Dist.CLIENT)
+@EventBusSubscriber(modid = "thida", value = Dist.CLIENT)
 public final class ThidaDomainRenderer {
     @SubscribeEvent public static void logout(ClientPlayerNetworkEvent.LoggingOut e) { ThidaDomainState.clear(); }
-    @SubscribeEvent public static void tick(TickEvent.ClientTickEvent e) {
-        if (e.phase == TickEvent.Phase.END && !Minecraft.getInstance().isPaused()) ThidaDomainState.tick();
+    @SubscribeEvent public static void tick(ClientTickEvent.Post e) {
+        if (!Minecraft.getInstance().isPaused()) ThidaDomainState.tick();
     }
     @SubscribeEvent public static void render(RenderLevelStageEvent event) {
         if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_PARTICLES) return;
@@ -29,7 +29,7 @@ public final class ThidaDomainRenderer {
             var n = view.data();
             if (!n.getString("dimension").equals(mc.level.dimension().location().toString())) continue;
             double radius = Math.max(1, Math.min(128, n.getDouble("radius")));
-            float age = ThidaDomainState.age(view, event.getPartialTick());
+            float age = ThidaDomainState.age(view, event.getPartialTick().getGameTimeDeltaPartialTick(false));
             float progress = Math.min(1, age / 60f);
             double r = radius * (1 - Math.pow(1 - progress, 3));
             poses.pushPose();
@@ -134,7 +134,7 @@ public final class ThidaDomainRenderer {
         vertex(v,m,x3,y3,z3,r,g,b,a);vertex(v,m,x4,y4,z4,r,g,b,a);
     }
     private static void vertex(VertexConsumer v,Matrix4f m,double x,double y,double z,int r,int g,int b,float a) {
-        v.vertex(m,(float)x,(float)y,(float)z).color(r,g,b,(int)(255*a)).endVertex();
+        v.addVertex(m,(float)x,(float)y,(float)z).setColor(r,g,b,(int)(255*a));
     }
     private ThidaDomainRenderer() {}
 }

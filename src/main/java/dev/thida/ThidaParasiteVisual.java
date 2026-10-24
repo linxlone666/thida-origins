@@ -5,7 +5,8 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.decoration.ArmorStand;
-import net.minecraft.world.item.DyeableLeatherItem;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.world.item.component.DyedItemColor;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 
@@ -19,10 +20,10 @@ public final class ThidaParasiteVisual {
         doll.setCustomName(null); doll.setCustomNameVisible(false);
         doll.setItemSlot(EquipmentSlot.HEAD, new ItemStack(ThidaMod.PARASITE_MASK.get()));
         ItemStack robe = new ItemStack(Items.LEATHER_CHESTPLATE);
-        ((DyeableLeatherItem)robe.getItem()).setColor(robe, 0x29152F);
+        robe.set(DataComponents.DYED_COLOR, new DyedItemColor(0x29152F, false));
         doll.setItemSlot(EquipmentSlot.CHEST, robe);
         ItemStack legs = new ItemStack(Items.LEATHER_LEGGINGS);
-        ((DyeableLeatherItem)legs.getItem()).setColor(legs, 0x573047);
+        legs.set(DataComponents.DYED_COLOR, new DyedItemColor(0x573047, false));
         doll.setItemSlot(EquipmentSlot.LEGS, legs);
         doll.setLeftArmPose(new Rotations(-32, -12, -20));
         doll.setRightArmPose(new Rotations(-32, 12, 20));
