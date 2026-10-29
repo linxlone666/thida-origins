@@ -6,6 +6,7 @@ import java.util.Map;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResultHolder;
@@ -45,6 +46,36 @@ public final class ThidaMod {
                       net.minecraft.world.effect.MobEffectCategory.HARMFUL, 0x7F2B5C) {});
   public static final DeferredItem<Item> PARASITE_MASK =
       ITEMS.register("parasite_mask", () -> new Item(new Item.Properties().stacksTo(1)));
+  public static final DeferredHolder<
+          net.minecraft.world.effect.MobEffect, net.minecraft.world.effect.MobEffect>
+      MAYAROM_WEAKNESS = harmful("mayarom_weakness", 0x743E87),
+      MAYAROM_BLEED = harmful("mayarom_bleed", 0xA82E45),
+      MAYAROM_VULNERABILITY = harmful("mayarom_vulnerability", 0xAE6B96);
+  public static final DeferredHolder<
+          net.minecraft.world.effect.MobEffect, net.minecraft.world.effect.MobEffect>
+      MAYAROM_SLOW =
+          EFFECTS.register(
+              "mayarom_slow",
+              () ->
+                  new net.minecraft.world.effect.MobEffect(
+                      net.minecraft.world.effect.MobEffectCategory.HARMFUL,
+                      0x743E87) {}.addAttributeModifier(
+                      net.minecraft.world.entity.ai.attributes.Attributes.ATTACK_SPEED,
+                      ResourceLocation.fromNamespaceAndPath(MOD_ID, "mayarom_slow"),
+                      -.20,
+                      net.minecraft.world.entity.ai.attributes.AttributeModifier.Operation
+                          .ADD_MULTIPLIED_TOTAL));
+
+  private static DeferredHolder<
+          net.minecraft.world.effect.MobEffect, net.minecraft.world.effect.MobEffect>
+      harmful(String name, int color) {
+    return EFFECTS.register(
+        name,
+        () ->
+            new net.minecraft.world.effect.MobEffect(
+                net.minecraft.world.effect.MobEffectCategory.HARMFUL, color) {});
+  }
+
   public static final Map<String, DeferredItem<? extends Item>> ABILITIES = new LinkedHashMap<>();
   // Old IDs remain inert for existing saves; excluded from kits, creative tabs and recipes.
   public static final Map<String, DeferredItem<? extends Item>> RETIRED = new LinkedHashMap<>();

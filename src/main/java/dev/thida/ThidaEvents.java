@@ -71,6 +71,7 @@ public final class ThidaEvents {
   }
 
   public static void debugEndPowers(ServerPlayer p) {
+    ThidaMayarom.endForDebug(p);
     ThidaBonds.endHeart(p.server, p.getUUID(), "DEBUG_END");
     ThidaBonds.breakParasite(p.server, p.getUUID(), "DEBUG_END", false);
     CompoundTag n = state(p);
@@ -227,6 +228,7 @@ public final class ThidaEvents {
     data.put("cooldowns", cooldowns);
     data.put("activeEffects", activeEffects);
     ThidaBonds.hud(p, data);
+    if (isThida(p)) ThidaMayarom.hud(p, data);
     return data;
   }
 
@@ -419,19 +421,11 @@ public final class ThidaEvents {
         return InteractionResultHolder.success(stack);
       }
       case "domain_talisman" -> {
-        if (n.getLong("domain") > now(p)) return InteractionResultHolder.fail(stack);
-        n.putLong("domain", now(p) + ThidaConfig.DOMAIN_DURATION.get() * 20L);
-        n.putDouble("domainX", p.getX());
-        n.putDouble("domainY", p.getY());
-        n.putDouble("domainZ", p.getZ());
-        n.putString("domainDimension", p.level().dimension().location().toString());
-        n.putLong("domainStarted", now(p));
-        n.putBoolean("domainFx", true);
-        ThidaDomainFx.open(p.serverLevel(), domainCenter(p));
-        syncDomainVisual(p, true);
-        n.putLong(
-            "cd_domain_talisman", n.getLong("domain") + ThidaConfig.DOMAIN_COOLDOWN.get() * 20L);
-        return InteractionResultHolder.success(stack);
+        boolean wasActive = ThidaMayarom.active(p);
+        ThidaMayarom.toggle(p);
+        return wasActive != ThidaMayarom.active(p)
+            ? InteractionResultHolder.success(stack)
+            : InteractionResultHolder.fail(stack);
       }
       default -> {
         return InteractionResultHolder.pass(stack);
@@ -495,9 +489,6 @@ public final class ThidaEvents {
         && event.getSource().getEntity() instanceof ServerPlayer attacker
         && state(attacker).getLong("weakUntil") > now(attacker))
       event.setAmount(event.getAmount() * 0.7F);
-    if (!transfer && event.getEntity() instanceof ServerPlayer p && inDomain(p, p))
-      event.setAmount(
-          CombatRules.domainDamage(event.getAmount(), 1 - ThidaConfig.DOMAIN_REDUCTION.get()));
   }
 
   @SubscribeEvent(priority = EventPriority.LOWEST)
@@ -535,22 +526,6 @@ public final class ThidaEvents {
                 attacker,
                 ThidaMessages.text("ui.thida.events.damage.1") + victim.getScoreboardName());
           }
-        }
-        if (inDomain(attacker, victim)) {
-          effect(victim, MobEffects.WEAKNESS, seconds(), 0);
-          state(victim).putLong("weakUntil", now(victim) + seconds());
-          effect(victim, MobEffects.BLINDNESS, seconds(), 0);
-        }
-      }
-      for (ServerPlayer owner : victim.server.getPlayerList().getPlayers()) {
-        if (dollsAllowed(owner)
-            && resolve(owner, "narotra_doll") == attacker
-            && inDomain(owner, attacker)
-            && inDomain(owner, victim)) {
-          // Domain curse is temporary; it does not overwrite the one manually linked target.
-          curse(victim, 0);
-          curse(victim, 1);
-          curse(victim, 2);
         }
       }
     }
@@ -671,28 +646,6 @@ public final class ThidaEvents {
       if (p.isAlive()) addonHeal(p, p, ThidaConfig.PARASITE_BREAK_HEAL.get().floatValue());
     }
     ThidaPassives.tick(p, n, time);
-    ServerPlayer marked = resolve(p, "narotra_doll");
-    if (n.getLong("domain") > time) {
-      if (time % 10 == 0) syncDomainVisual(p, true);
-      if (inDomain(p, p)) cleanse(p);
-      if (marked != null && dollsAllowed(p) && inDomain(p, marked)) {
-        effect(marked, MobEffects.DAMAGE_BOOST, 2, 1);
-        effect(marked, MobEffects.DAMAGE_RESISTANCE, 2, 1);
-      }
-      var domainDimension = ResourceLocation.tryParse(n.getString("domainDimension"));
-      var domainLevel =
-          domainDimension == null
-              ? null
-              : p.server.getLevel(
-                  net.minecraft.resources.ResourceKey.create(
-                      net.minecraft.core.registries.Registries.DIMENSION, domainDimension));
-      if (domainLevel != null)
-        ThidaDomainFx.tick(
-            domainLevel,
-            domainCenter(p),
-            ThidaConfig.DOMAIN_RADIUS.get(),
-            n.contains("domainStarted") ? time - n.getLong("domainStarted") : 80 + time % 20);
-    } else if (n.getBoolean("domainFx")) closeDomainFx(p);
     syncHud(p);
   }
 

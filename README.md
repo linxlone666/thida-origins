@@ -1,5 +1,10 @@
 # Thida Origins
 
+This branch implements **เสน่ห์มายารมณ์ (Mayarom)**, version `0.9.0-mayarom-dev`,
+on the recovered 0.8.9 source below. Press `4` to activate/cancel after an operator runs
+`/thida unlock <player> skill4`. See [ultimate rules and integration handoff](docs/ULTIMATE_MAYAROM_TH.md).
+The alternative ultimate **เรือนเสน่หา** is not included in this branch.
+
 Minecraft Origins mod. Current recovered source: **0.8.9-neoforge-dev** for **Minecraft 1.21.1, NeoForge 21.1.233, Java 21**.
 
 ม็อด Origin ธิดา — ซอร์สปัจจุบัน 0.8.9 พร้อมเอกสารภาษาไทยและประวัติรุ่นที่กู้คืน

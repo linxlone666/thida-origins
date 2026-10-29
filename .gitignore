@@ -5,6 +5,7 @@ build/
 run/
 forge-mdk.zip
 *.log
+logs/
 .idea/
 *.iml
 build-neoforge/

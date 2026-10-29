@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "bindings": [
+    {
+      "enabled": false,
+      "event": "ULTIMATE_STARTED",
+      "power": "mayarom",
+      "component": "ultimate",
+      "resource": "thida:preview/end_rod",
+      "anchor": "USER",
+      "offset": [0, 1, 0],
+      "scale": 1,
+      "loop": true,
+      "lifetimeTicks": 0
+    },
+    {
+      "enabled": false,
+      "event": "ULTIMATE_HIT",
+      "power": "mayarom",
+      "component": "pulse",
+      "resource": "thida:preview/end_rod",
+      "anchor": "TARGET",
+      "offset": [0, 1, 0],
+      "scale": 1,
+      "loop": false,
+      "lifetimeTicks": 20
+    }
+  ]
+}

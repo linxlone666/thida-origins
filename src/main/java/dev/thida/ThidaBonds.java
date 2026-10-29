@@ -126,6 +126,7 @@ public final class ThidaBonds {
     switch (request.getString("action")) {
       case "summon" -> summon(p);
       case "heart" -> requestHeart(p);
+      case "ultimate" -> ThidaMayarom.toggle(p);
       case "confirm" -> confirm(p, request);
       case "cast" -> ThidaSpells.cast(p, request.getString("doll"), request.getInt("spell"));
       case "select" -> {
@@ -348,6 +349,7 @@ public final class ThidaBonds {
     var n = data(p);
     return n.getLong("heartWard") > time
         || n.getLong("parasiteWard") > time
+        || ThidaMayarom.active(p)
         || ThidaSpells.warded(p);
   }
 
@@ -862,10 +864,7 @@ public final class ThidaBonds {
     if (!(event.getEntity() instanceof ServerPlayer p)
         || event.getEffectInstance().getEffect().value().getCategory()
             != net.minecraft.world.effect.MobEffectCategory.HARMFUL) return;
-    long time = now(p.server);
-    var n = data(p);
-    if (n.getLong("heartWard") > time || n.getLong("parasiteWard") > time || ThidaSpells.warded(p))
-      event.setResult(MobEffectEvent.Applicable.Result.DO_NOT_APPLY);
+    if (warded(p)) event.setResult(MobEffectEvent.Applicable.Result.DO_NOT_APPLY);
   }
 
   public static void addModifier(

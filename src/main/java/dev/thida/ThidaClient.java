@@ -22,6 +22,7 @@ public final class ThidaClient {
   public static final KeyMapping OPEN_MENU = key("open_doll_menu", GLFW.GLFW_KEY_1);
   public static final KeyMapping SUMMON = key("summon_parasite", GLFW.GLFW_KEY_2);
   public static final KeyMapping HEART = key("heart_bond", GLFW.GLFW_KEY_3);
+  public static final KeyMapping ULTIMATE = key("mayarom", GLFW.GLFW_KEY_4);
   public static final KeyMapping EDIT_HUD = key("edit_hud", GLFW.GLFW_KEY_H);
 
   static {
@@ -44,6 +45,7 @@ public final class ThidaClient {
       e.register(OPEN_MENU);
       e.register(SUMMON);
       e.register(HEART);
+      e.register(ULTIMATE);
       e.register(EDIT_HUD);
     }
   }
@@ -93,6 +95,10 @@ public final class ThidaClient {
     while (EDIT_HUD.consumeClick()) {
       drainConflicts(EDIT_HUD);
       mc.setScreen(new ThidaBondHud.PositionScreen(null));
+    }
+    while (ULTIMATE.consumeClick()) {
+      drainConflicts(ULTIMATE);
+      request("ultimate", "", 0);
     }
   }
 

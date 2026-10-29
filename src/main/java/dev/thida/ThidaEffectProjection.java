@@ -21,6 +21,24 @@ final class ThidaEffectProjection {
       UUID ownerId = UUID.fromString(id);
       var owner = server.getPlayerList().getPlayer(ownerId);
       if (owner != null) {
+        if (owner.isAlive() && ThidaMayarom.active(owner)) {
+          var ultimate = store.player(ownerId);
+          add(
+              result,
+              epoch,
+              identity(server, ThidaBondData.child(ultimate, "mayaromPresentation")),
+              "ULTIMATE_STARTED",
+              ThidaMayarom.ID,
+              "",
+              "ultimate",
+              owner,
+              null,
+              ownerId,
+              ultimate.getLong("mayaromUntil") - ThidaMayarom.DURATION,
+              ultimate.getLong("mayaromUntil"),
+              now,
+              ThidaEffectEvent.Anchor.USER);
+        }
         var root = ThidaEvents.state(owner);
         if (root.hasUUID("gazeTarget")) {
           var target = server.getPlayerList().getPlayer(root.getUUID("gazeTarget"));

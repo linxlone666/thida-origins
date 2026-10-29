@@ -387,6 +387,7 @@ public final class ThidaGameTests {
           FakePlayer p = f.player(true);
           near(
               h, ThidaConfig.DOMAIN_REDUCTION.get(), 0.7, "Test requires default domain reduction");
+          ThidaBonds.data(p).putBoolean("unlock4", true);
           use(h, p, "domain_talisman");
           LivingIncomingDamageEvent event = incoming(p, p.damageSources().generic(), 10);
           NeoForge.EVENT_BUS.post(event);
@@ -646,83 +647,106 @@ public final class ThidaGameTests {
   }
 
   @GameTest(template = "empty")
-  public static void domainStationaryAndCooldownAfterExpiry(GameTestHelper h) {
+  public static void mayaromFollowsCasterAndCooldownStartsOnEnd(GameTestHelper h) {
     run(
         h,
         f -> {
-          FakePlayer owner = f.player(true);
+          var owner = f.player(true);
+          ThidaBonds.data(owner).putBoolean("unlock4", true);
           use(h, owner, "domain_talisman");
-          long time = owner.level().getGameTime();
-          near(h, state(owner).getLong("domain") - time, 6000, "Domain lasts five minutes");
-          h.assertTrue(state(owner).getBoolean("domainFx"), "Cast starts domain visual lifecycle");
-          for (long age : new long[] {0, 20, 56, 60, 80}) {
-            state(owner).putLong("domainStarted", time - age);
-            tick(owner);
-          }
-          near(
-              h,
-              state(owner).getLong("cd_domain_talisman") - time,
-              30000,
-              "Next cast is twenty-five minutes later");
-          owner.setPos(owner.getX() + 40, owner.getY(), owner.getZ());
-          LivingIncomingDamageEvent hit = incoming(owner, owner.damageSources().generic(), 10);
+          near(h, ThidaMayarom.remaining(owner), 6000, "Five minute duration");
+          near(h, ThidaMayarom.cooldown(owner), 0, "No cooldown until the ultimate ends");
+          owner.setPos(owner.getX() + 140, owner.getY(), owner.getZ());
+          var hit = incoming(owner, owner.damageSources().generic(), 10);
           NeoForge.EVENT_BUS.post(hit);
-          near(h, hit.getAmount(), 10, "Domain must not follow caster");
-          state(owner).putLong("domain", time);
-          tick(owner);
-          h.assertTrue(!state(owner).getBoolean("domainFx"), "Expiry closes visual lifecycle");
-          var stack = owner.getMainHandItem();
-          h.assertTrue(
-              stack.use(owner.level(), owner, InteractionHand.MAIN_HAND).getResult()
-                  == InteractionResult.FAIL,
-              "Cooldown still applies after expiry");
+          near(h, hit.getAmount(), 3, "Body form follows caster without a radius");
+          NeoForge.EVENT_BUS.post(new PlayerEvent.PlayerLoggedOutEvent(owner));
+          h.assertTrue(ThidaMayarom.active(owner), "Logout retains ultimate");
+          NeoForge.EVENT_BUS.post(
+              new net.neoforged.neoforge.event.entity.living.LivingDeathEvent(
+                  owner, owner.damageSources().generic()));
+          h.assertTrue(ThidaMayarom.active(owner), "Death retains ultimate state");
+          NeoForge.EVENT_BUS.post(
+              new PlayerEvent.PlayerChangedDimensionEvent(
+                  owner,
+                  net.minecraft.world.level.Level.OVERWORLD,
+                  net.minecraft.world.level.Level.NETHER));
+          h.assertTrue(ThidaMayarom.active(owner), "Dimension change retains ultimate");
+          ThidaMayarom.toggle(owner);
+          h.assertTrue(!ThidaMayarom.active(owner), "Second press cancels");
+          near(h, ThidaMayarom.cooldown(owner), 24000, "Cancel starts twenty minute cooldown");
+          ThidaMayarom.toggle(owner);
+          h.assertTrue(!ThidaMayarom.active(owner), "Cooldown cannot be bypassed");
         });
   }
 
   @GameTest(template = "empty")
-  public static void domainCursePreservesSingleManualMark(GameTestHelper h) {
+  public static void mayaromNarotraBuffAndCursesPreserveManualMark(GameTestHelper h) {
     run(
         h,
         f -> {
-          FakePlayer owner = f.player(true),
-              ally = f.player(false),
-              marked = f.player(false),
-              victim = f.player(false);
-          state(owner).putUUID("narotra_doll", ally.getUUID());
+          var owner = f.player(true);
+          var ally = f.player(false);
+          var marked = f.player(false);
+          var victim = f.player(false);
+          ally.setPos(owner.getX(), owner.getY(), owner.getZ() + 4);
+          completeNarotra(owner, ally, ThidaBonds.now(owner.server));
           state(owner).putUUID("nilakan_doll", marked.getUUID());
-          use(h, owner, "domain_talisman");
-          tick(owner);
+          ThidaBonds.data(owner).putBoolean("unlock4", true);
+          ThidaMayarom.toggle(owner);
           h.assertTrue(
-              ally.hasEffect(MobEffects.DAMAGE_BOOST), "Domain strengthens linked Narotra player");
-          h.assertTrue(
-              victim.hurt(victim.damageSources().playerAttack(ally), 2),
-              "Real linked ally hit lands");
+              ThidaPassives.isBondAvailable(owner, "narotra_doll"), "Narotra link available");
+          var attack = incoming(victim, victim.damageSources().playerAttack(ally), 10);
+          NeoForge.EVENT_BUS.post(attack);
+          near(h, attack.getAmount(), 12, "Narotra melee increases twenty percent");
+          var defense = incoming(ally, ally.damageSources().generic(), 10);
+          NeoForge.EVENT_BUS.post(defense);
+          near(h, defense.getAmount(), 8, "Narotra incoming decreases twenty percent");
+          h.assertTrue(victim.hurt(victim.damageSources().playerAttack(ally), 2), "Ally hit lands");
           h.assertTrue(
               state(owner).getUUID("nilakan_doll").equals(marked.getUUID()),
-              "Domain must not replace manual mark");
+              "Manual mark unchanged");
           h.assertTrue(
-              victim.hasEffect(MobEffects.BLINDNESS)
-                  && victim.hasEffect(MobEffects.WEAKNESS)
-                  && state(victim).getLong("vulnerableUntil") > victim.level().getGameTime(),
-              "Domain applies all three curses");
-          long now = victim.level().getGameTime();
-          for (String key : new String[] {"weakUntil", "slow", "bleed", "vulnerableUntil"})
-            near(h, state(victim).getLong(key) - now, 400, "Domain duration: " + key);
+              victim.hasEffect(ThidaMod.MAYAROM_WEAKNESS)
+                  && victim.hasEffect(ThidaMod.MAYAROM_BLEED)
+                  && victim.hasEffect(ThidaMod.MAYAROM_VULNERABILITY)
+                  && victim.hasEffect(MobEffects.BLINDNESS),
+              "All Nilakan spell results applied");
           near(
               h,
               victim.getAttributeValue(Attributes.ATTACK_SPEED),
-              2,
-              "Domain halves attack speed");
-          var incoming = incoming(victim, victim.damageSources().generic(), 10);
-          NeoForge.EVENT_BUS.post(incoming);
+              3.2,
+              "Attack speed decreases twenty percent");
           near(
               h,
-              incoming.getAmount(),
-              10 * (1 + ThidaConfig.VULNERABILITY.get()),
-              "Domain vulnerability increases incoming damage");
-          var outgoing = incoming(marked, marked.damageSources().playerAttack(victim), 10);
-          NeoForge.EVENT_BUS.post(outgoing);
-          near(h, outgoing.getAmount(), 7, "Domain weakness reduces outgoing damage");
+              victim.getEffect(ThidaMod.MAYAROM_BLEED).getDuration(),
+              100,
+              "Bleed lasts five seconds");
+          near(
+              h,
+              victim.getEffect(ThidaMod.MAYAROM_WEAKNESS).getDuration(),
+              200,
+              "Weakness lasts ten seconds");
+          h.assertTrue(
+              !ThidaBondData.get(owner.server).occupied(victim.getUUID(), owner.getUUID(), ""),
+              "Curse creates no bond");
+          var weakHit = incoming(marked, marked.damageSources().playerAttack(victim), 10);
+          NeoForge.EVENT_BUS.post(weakHit);
+          near(h, weakHit.getAmount(), 8, "Curse reduces outgoing damage twenty percent");
+          var vulnerableHit = incoming(victim, victim.damageSources().generic(), 10);
+          NeoForge.EVENT_BUS.post(vulnerableHit);
+          near(h, vulnerableHit.getAmount(), 12, "Curse increases incoming damage twenty percent");
+          long due = ThidaBonds.now(owner.server);
+          ThidaBonds.data(victim).putLong("mayaromNextBleed", due);
+          victim.invulnerableTime = 0;
+          victim.hurt(victim.damageSources().playerAttack(ally), 2);
+          near(
+              h,
+              ThidaBonds.data(victim).getLong("mayaromNextBleed"),
+              due,
+              "Refreshing curse does not postpone an already due bleed tick");
+          ThidaEvents.cleanse(victim);
+          h.assertTrue(!victim.hasEffect(ThidaMod.MAYAROM_BLEED), "Curse can be cleansed");
         });
   }
 
@@ -798,13 +822,14 @@ public final class ThidaGameTests {
           FakePlayer owner = f.player(true), target = f.player(false);
           state(owner).putInt("gaze", 120);
           state(owner).putUUID("gazeTarget", target.getUUID());
+          ThidaBonds.data(owner).putBoolean("unlock4", true);
           use(h, owner, "domain_talisman");
           var data = ThidaEvents.hudSnapshot(owner);
           near(h, data.getLong("domain"), 6000, "HUD domain active countdown");
           near(
               h,
               data.getCompound("cooldowns").getLong("cd_domain_talisman"),
-              30000,
+              0,
               "HUD domain readiness deadline");
           near(h, data.getInt("gaze"), 120, "HUD gaze progress");
           h.assertTrue(
@@ -813,8 +838,8 @@ public final class ThidaGameTests {
               "HUD target gaze and inside-domain status");
           owner.setPos(owner.getX() + 40, owner.getY(), owner.getZ());
           h.assertTrue(
-              !ThidaEvents.hudSnapshot(owner).getBoolean("inDomain"),
-              "HUD reflects leaving fixed domain");
+              ThidaEvents.hudSnapshot(owner).getBoolean("inDomain"),
+              "HUD body form remains active after moving");
         });
   }
 

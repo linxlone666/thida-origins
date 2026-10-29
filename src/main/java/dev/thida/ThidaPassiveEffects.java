@@ -35,6 +35,7 @@ public final class ThidaPassiveEffects {
           "NILAKAN_LINKED",
           "LINK_RESUMED",
           "SPELL_EFFECT_STARTED",
+          "ULTIMATE_STARTED",
           "PARASITE_LINKED",
           "HEART_LINKED",
           "HEART_INVULNERABILITY_STARTED",
@@ -352,6 +353,7 @@ public final class ThidaPassiveEffects {
     return switch (message.component()) {
       case "attempt" -> "NAROTRA_ATTEMPT_ENDED";
       case "spell" -> "SPELL_EFFECT_ENDED";
+      case "ultimate" -> "ULTIMATE_ENDED";
       case "invulnerability" -> "HEART_INVULNERABILITY_ENDED";
       case "bond" ->
           message.power().equals("heart")
@@ -376,5 +378,6 @@ public final class ThidaPassiveEffects {
     installAudiencePolicy(null);
     ThidaSkillIntegration.install(null);
     ThidaManaIntegration.install(null);
+    ThidaMayaromScaling.install(null);
   }
 }
