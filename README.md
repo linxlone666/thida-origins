@@ -28,6 +28,14 @@ Linux/macOS:
 
 Output: `build-neoforge/libs/`. Historical Forge tags require their original Minecraft/Forge/Java versions, rather than the current profile. No local caches, JDK installations, worlds or dependency JARs are included.
 
+The Windows helper also builds the Origin datapack and can run GameTests:
+
+```powershell
+.\tools\Build-NeoForge.ps1 -GameTests
+```
+
+Add `-Offline` after dependencies have been cached. The helper respects existing `JAVA_HOME` and `GRADLE_USER_HOME` settings and supports Java paths containing `&`.
+
 ## Current controls
 
 - `1`: doll/spell menu; mouse wheel selects, left click confirms, right click/Esc returns.

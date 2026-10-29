@@ -41,7 +41,7 @@ method quote(ServerPlayer, ThidaSpell) bridge เข้าสัญญา String
 
 Payment ของ Resolution ถูกห่อ one-shot และมีตัวกัน reentrant cast ต่อผู้เล่น คำขอร่ายซ้ำที่ติด CD ไม่หักซ้ำ
 อย่าเรียก quote เองแล้ว consume ใน UI และห้ามใช้ยอดมานา ราคา หรือพลังเวทย์จาก packet client
-Resolution แยก READY, UNAVAILABLE (ยังไม่ติดตั้ง), NOT_READY (provider ยังไม่พร้อม), INVALID (ข้อมูล/การเรียกใช้ไม่ได้)
+Resolution ประกาศ READY, UNAVAILABLE, NOT_READY, INVALID แต่โหมดไม่มี provider ในรุ่นนี้คืน READY ด้วยค่าพื้นฐาน ไม่คืน UNAVAILABLE
 กรณี consume คืน false แจ้งมานาไม่พอ ค่าร่ายและราคาไม่ต้องเผยในข้อความผู้เล่น
 
 parasiteBreakReduction(caster, target) คืน fraction ผลสุดท้ายสำหรับบัฟเป้าหมาย 10 วินาที; หากไม่มี adapter ใช้ 0.20 หากติดตั้ง adapter แล้วคืน Optional.empty จะไม่เพิ่มผลลดดาเมจส่วนนี้
