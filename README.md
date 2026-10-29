@@ -1,7 +1,7 @@
 # Thida Origins
 
 ม็อด Origin ธิดา สำหรับ **Minecraft 1.21.1 / NeoForge 21.1.233 / Java 21**
-รุ่นปัจจุบันใน branch `codex/ultimate-mayarom`: **0.9.0-mayarom-dev**
+เลขเวอร์ชันม็อดกำหนดใน [gradle.properties](gradle.properties) ที่ค่า `mod_version`
 
 รวม Passive, Skill 1–3 และอัลติ **เสน่ห์มายารมณ์** ส่วนเรือนเสน่หายังไม่รวมใน branch นี้
 เล่นได้ด้วยค่าพื้นฐานโดยไม่ติดตั้งม็อดสเกลพลังเวทย์หรือ AAA ไม่มีการเชื่อม Iron's Spellbooks
