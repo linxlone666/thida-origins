@@ -12,7 +12,7 @@ New-Item -ItemType Directory -Path $destination | Out-Null
 $source = Join-Path $destination 'source'
 New-Item -ItemType Directory -Path $source | Out-Null
 foreach ($name in @('src','gradle')) { Copy-Item -LiteralPath (Join-Path $projectRoot $name) -Destination $source -Recurse }
-foreach ($name in @('build.gradle','settings.gradle','gradle.properties','gradlew','gradlew.bat','.gitignore','README.md','LICENSE','HISTORY.md','HISTORY_TH.md','RECOVERED_SOURCE_STATUS.md')) {
+foreach ($name in @('build.gradle','settings.gradle','gradle.properties','gradlew','gradlew.bat','.gitignore','README.md','LICENSE')) {
     Copy-Item -LiteralPath (Join-Path $projectRoot $name) -Destination $source
 }
 $tools = Join-Path $source 'tools'

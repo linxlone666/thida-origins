@@ -60,8 +60,6 @@ Linux/macOS ใช้ `./gradlew` แทน ผลลัพธ์อยู่ใ
 | `tools/` | สคริปต์ build และแพ็กส่งต่อ |
 | `archive/` | JAR และหลักฐานรุ่นเดิม ไม่ใช่ dependencies ของ build ปัจจุบัน |
 
-ประวัติที่กู้คืนอยู่ใน [HISTORY.md](HISTORY.md), [ภาษาไทย](HISTORY_TH.md)
-และ [ข้อจำกัดของซอร์สที่กู้คืน](RECOVERED_SOURCE_STATUS.md)
 ไฟล์ใน `archive/` มีเฉพาะเมื่อ clone repository เต็มชุด ไม่รวมในแพ็ก source สำหรับส่งต่อ
 คง tag, commit และ checksum ของรุ่นเก่าไว้ โดยไม่ใช้บันทึกรุ่นเก่าเป็นข้อกำหนดแทนโค้ดปัจจุบัน
 
