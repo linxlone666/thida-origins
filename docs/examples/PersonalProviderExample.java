@@ -1,6 +1,7 @@
 package handoff.example;
 
 import dev.thida.ThidaManaIntegration;
+import dev.thida.ThidaMayaromScaling;
 import dev.thida.ThidaSkillIntegration;
 import dev.thida.ThidaSpell;
 import java.util.Optional;
@@ -9,6 +10,12 @@ import net.minecraft.server.level.ServerPlayer;
 
 /** Documentation-only facades: substitute calls to the personal mod's confirmed API here. */
 public final class PersonalProviderExample {
+    public interface MagicStats {
+        double magicPower(UUID player);
+    }
+    public static void registerMayarom(MagicStats stats) {
+        ThidaMayaromScaling.install(player -> stats.magicPower(player.getUUID()));
+    }
     public interface PersonalMana {
         double maximum(UUID player);
         double current(UUID player);
@@ -39,6 +46,7 @@ public final class PersonalProviderExample {
         });
     }
     public static void unregister() {
+        ThidaMayaromScaling.install(null);
         ThidaManaIntegration.install(null);
         ThidaSkillIntegration.install(null);
     }

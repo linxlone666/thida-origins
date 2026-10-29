@@ -1,4 +1,7 @@
-# โครงสร้างโปรเจกต์ 0.8.1
+# โครงสร้างโปรเจกต์ 0.9.0-mayarom-dev
+
+เริ่มเชื่อมม็อดภายนอกที่ [Guide พลังเวทย์](MAGIC_INTEGRATION_GUIDE_TH.md)
+หรือ [Guide เอฟเฟกต์](EFFECTS_INTEGRATION_GUIDE_TH.md) บันทึกรุ่นเก่าอยู่ใน `history/`
 
 | ส่วน | หน้าที่ |
 |---|---|
@@ -8,6 +11,7 @@
 | ThidaBonds | กาฝาก/หทัย การยืนยัน เงื่อนไข HP วงจรชีวิต |
 | ThidaSpells / ThidaSpell | คาถา Skill 1 และ ID/เลขคาถาที่เก็บได้แบบเดิม |
 | ThidaSkillIntegration / ThidaManaIntegration / ThidaHealing | API ค่าร่าย/สเกล ฟื้นมานา และการระบุผู้ฮีล |
+| ThidaMayarom / ThidaMayaromScaling | อัลติกายแท้ที่เก็บเวลาใน SavedData และ provider พลังเวทย์ดิบ |
 | ThidaDollInventory / mixin หุ่น | กฎห้ามโยน/ย้ายออก รักษาหุ่นขณะย้ายช่องและหลังเกิดใหม่ |
 | ThidaClient / ThidaHud / ThidaBondHud | ปุ่ม เมนู รายชื่อ สกิน และตำแหน่งในเครื่อง |
 | ThidaHudEditor / ThidaHudLayout | หน้าจัด HUD ผ่าน H ขนาด/ตำแหน่งรายแผง และกรอบรับเมาส์ตรงกับภาพที่ย่อขยาย |
@@ -17,7 +21,7 @@
 | ThidaEffectEvent / ThidaEffectBinding | สัญญาข้อมูลและ mapping ของ Thida |
 | ThidaClientEffects | dedup, resume, อายุภาพ, handle และ cleanup |
 | client/effects | resource reload, entity anchor และตัวอย่าง preview (ไม่มี AAA จริง) |
-| ThidaEvents / ThidaDomain* | ทางเข้าเดิมและ compatibility รวมโดเมนเดิม ไม่ออกแบบ ULT ใหม่ |
+| ThidaEvents / ThidaDomain* | ทางเข้าและ compatibility เดิม; อัลติใหม่ใช้ ThidaMayarom ไม่ใช้วงโดเมนเก่า |
 
 ## การอ่านและจ่ายค่าร่าย
 
@@ -32,7 +36,8 @@ Payment ของ resolution เป็น one-shot และกัน reentrant 
 เพิ่ม thida_effect_id และ fx_* เพื่อจำชุดภาพแบบ lazy/idempotent ไม่มีการเปลี่ยน HP คูลดาวน์ หรือ reset เซฟ
 คง heart_doll และ registry เก่าเพื่อให้โลกโหลดได้ ไม่กลับไปใช้ไอเทมเก่าเป็นวิธีร่ายหทัย
 คง mixin แก้ AFP, การฮีล, การย้ายหุ่น เพราะยังมีหน้าที่และการทดสอบรองรับ
-คงพฤติกรรมโดเมนเก่า ตามข้อกำหนดไม่ทำ ULT ใหม่
+ยันต์ domain_talisman เดิมเรียกอัลติใหม่ด้วยสิทธิ์และคูลดาวน์เดียวกับปุ่ม 4
+คลาสและ config โดเมนเก่าบางส่วนยังอยู่เพื่อ compatibility ไม่ใช่จุดให้ผู้ทำเอฟเฟกต์เพิ่มกติกาใหม่
 
 ## Static state
 

@@ -1,12 +1,25 @@
-# จุดเชื่อมเอฟเฟกต์ Passive และ Skill 1–3 — event schema 2
+# Guide 2 — เอฟเฟกต์ Passive, Skill 1–3 และอัลติ / AAA backend
+
+คู่มือส่งต่อสำหรับ `0.9.0-mayarom-dev` / Minecraft 1.21.1 / NeoForge 21.1.233 / Java 21
+สัญญา event schema **2** และไฟล์ mapping schema **1** เป็นคนละเวอร์ชันกัน
+ตัวอย่าง backend ที่ตรวจคอมไพล์อยู่ใน [EffectBackendExample.java](examples/EffectBackendExample.java)
+เรื่องพลังเวทย์/มานาอ่าน [คู่มือส่วนที่ 1](MAGIC_INTEGRATION_GUIDE_TH.md)
+
+## เริ่มงานตามลำดับนี้
+
+1. Build ม็อดนี้ให้ผ่าน และอ่านตัวอย่าง `VanillaPreviewAdapter` เพื่อเข้าใจ start/update/close
+2. ยืนยันรุ่น AAA และ AAA World ที่ทีมจะใช้ ตรวจ API ตรงกับ JAR จริงก่อนเขียน backend
+3. ทำม็อด compatibility ฝั่ง client หรือ package client ที่ไม่ถูกโหลดใน dedicated server
+4. แทนที่ facade ในตัวอย่างด้วย API เล่น/อัปเดต/หยุดของ AAA รุ่นจริง
+5. ส่ง resource pack ที่มีไฟล์เอฟเฟกต์จริงและ mapping ของ Thida เปิด enabled เฉพาะรายการที่ทำแล้ว
+6. ทดสอบการคืนภาพและ cleanup ตามรายการท้ายคู่มือ ไม่แก้กติกาสกิลเพื่อเล่นภาพ
 
 ## สถานะที่ส่งมอบ
 
 ระบบจริงในรุ่นนี้คือ event schema 2, mapping, lifecycle/handle, การกู้ภาพสถานะ และ backend ตัวอย่างที่เปิดเองได้
 **ยังไม่มี AAA backend จริง ไม่มี dependency AAA ใหม่ และไม่ได้อ้างว่าเล่นไฟล์ AAA ได้แล้ว**
-โปรไฟล์ที่อ่านพบ aaa_particles-neoforge-1.21.1-2.2.3.jar และ aaa_particles_world-neoforge-1.21.1-2.0.0.jar จึงไม่ถือว่าสองไฟล์นี้มี API เดียวกัน
-แหล่งทางการที่ตรวจ: [รุ่น 2.2.3 NeoForge 1.21.1](https://modrinth.com/mod/aaa-particles/version/neoforge-1.21.1-2.2.3), [ซอร์สผู้พัฒนา](https://github.com/ChloePrime/AAAParticles)
-README สาขา master มีตัวอย่าง dependency สำหรับ 1.20.1 จึงไม่คัดลอกมาใช้กับ 1.21.1 หรือเดา signature
+AAA Particles และ AAA Particles: World ไม่ถือว่ามี API เดียวกัน
+ชื่อ method ของ AAA ไม่ได้ถูกกำหนดในคู่มือนี้ และตัวอย่างไม่ได้สมมติ API ภายนอกขึ้นมา
 ก่อนเพิ่มตัวเล่นจริง ให้ผู้รับงานยืนยัน source/javadoc ตรงรุ่นที่ตกลงใช้ รวมการ stop/dispose, resource reload และ thread ที่ API รองรับ
 
 ## เส้นทางเดียวและความรับผิดชอบ
@@ -39,7 +52,7 @@ ThidaEffectEvent เป็น record, save/read ใช้ NBT บน PassiveEffe
 หนึ่งวินาที = 20 ticks เวลาประมาณบน client ใช้ deadline/sentTick กับจำนวน tick หลังรับ packet
 spell เป็น narotra_shield, narotra_cleanse, narotra_renewal, nilakan_weakness, nilakan_bleed, nilakan_vulnerability หรือค่าว่าง
 ThidaSpell รวม storage index 0/1/2 กับเลขเอกสาร 2/3/4 ไว้ที่เดียว **ไม่ใส่เลขคาถาใน reason อีกแล้ว**
-power ใช้ narotra_doll, nilakan_doll, parasite, heart ชื่อ NAROTRA/NILAKAN เก่าแปลงที่ dispatcher
+power ใช้ narotra_doll, nilakan_doll, parasite, heart, mayarom ชื่อ NAROTRA/NILAKAN เก่าแปลงที่ dispatcher
 
 ## รายชื่อ event ที่ส่งจริง
 
@@ -65,12 +78,31 @@ power ใช้ narotra_doll, nilakan_doll, parasite, heart ชื่อ NAROTRA
 | HEART_DEATH_PREVENTED | ONE_SHOT ช่วยชีวิตจริง |
 | HEART_INVULNERABILITY_STARTED / HEART_INVULNERABILITY_ENDED | START/SYNC / STOP; component invulnerability |
 | HEART_BUFF_STARTED / HEART_BUFF_ENDED | START/SYNC / STOP; component ward หรือ speed |
+| ULTIMATE_STARTED / ULTIMATE_ENDED | START/SYNC / STOP; power mayarom, component ultimate, anchor USER |
+| ULTIMATE_HIT | ONE_SHOT; power mayarom, component pulse; reason MELEE_CURSE หรือ NILAKAN_ALL_SPELLS |
 
 LINK_CANCELLED ที่เคยส่งซ้ำกับ *_LINK_FAILED ถูกยุบ ไม่ส่ง packet ซ้ำ
 LINK_RESUMED เป็น SYNC เพื่อคืน loop โดยไม่เล่น burst ครั้งเดียวซ้ำ; ผู้รับใหม่ใช้ SYNC ของสถานะปัจจุบันเช่นกัน
 STOP ปิด handle ก่อนหา entity จึงยังเก็บกวาดได้แม้ผู้เล่นไม่อยู่แล้ว
 หทัยจบจะหยุดเฉพาะ bond ส่วน ward/speed/invulnerability ใช้ instance ของตนจน deadline
 after_defense ไม่สร้างภาพผลที่ยังไม่มีสูตร/provider
+
+## ภาพอัลติเสน่ห์มายารมณ์
+
+ไฟล์ตั้งต้นปิดไว้ที่ `assets/thida/thida_effects/mayarom.json`
+มีสอง binding: loop รอบตัวธิดา และภาพเมื่อโจมตีที่เป้าหมาย
+เปลี่ยน resource ID ให้ตรงกับ backend ของคุณและเปิด enabled เมื่อมีไฟล์จริง
+
+ภาพอัลติใช้ `power=mayarom`, `component=ultimate`, `anchor=USER`
+เป็นกายแท้ตามตัว ไม่ใช่พื้นอาณาเขตรัศมี 30/100 บล็อก ห้ามใช้ renderer โดเมนเก่าแทนกติกาใหม่
+อัลติคงสถานะหลังตาย ออกจากเกม และย้ายมิติ แต่ภาพบน entity ที่ไม่อยู่จะพัก
+เมื่อเกิดใหม่/เข้าเกมให้คืนเฉพาะเวลาที่เหลือด้วย SYNC โดยไม่เล่น burst เปิดอัลติซ้ำ
+เมื่อหมดเวลา/กดยกเลิกจะส่ง STOP พร้อม ULTIMATE_ENDED ให้ปิด handle
+
+ULTIMATE_HIT ใช้ reason แยกการโจมตีของธิดากับผลนิลกาลจากผู้เชื่อมนรตรา
+backend อ่าน `event.reason()` ได้ แต่ mapping parser ปัจจุบันกรองได้เฉพาะ event/power/spell/component
+ไม่มีตัวกรอง reason ใน JSON หากต้องการภาพต่างกันให้แยกใน backend หรือเพิ่ม API แบบเข้ากันย้อนหลัง
+mapping loop=false ไม่เล่นภาพซ้ำตอนรับ SYNC เช่นเดียวกับสกิลอื่น
 
 ## ลงทะเบียน backend และ mapping
 
@@ -144,3 +176,28 @@ backend AAA ต้องตรวจเอกสารรุ่นจริง�
 ตัวอย่างนี้อยู่ใน src/main/java/dev/thida/client/effects/VanillaPreviewAdapter.java และใช้ API vanilla ที่คอมไพล์จริง ไม่ใช่ pseudo AAA
 ประกอบกับตัวอย่าง JSON ด้านบน ผู้รับงานเปลี่ยนเพียง backend และ resource/mapping โดยไม่แก้คลาสสกิล
 การทดสอบ EffectLifecycleTest ใช้ handle จำลองนับ start/close ตรวจ packet ซ้ำ, STOP ไม่มี entity, reload, detach และ SYNC ไม่ replay one-shot
+
+## ตัวอย่าง backend สำหรับนำไปต่อ
+
+`docs/examples/EffectBackendExample.java` แสดงการเรียก `installAdapter`, การส่ง event/binding/Frame
+และ Handle ที่ปิดซ้ำได้อย่างปลอดภัย `Backend` กับ `Playback` เป็น facade ของตัวอย่าง
+ให้ผู้รับงาน implement ด้วย AAA รุ่นที่ตกลงใช้ ไม่ใช่ชื่อคลาสจากม็อด AAA จริง
+ตัวอย่างนี้ตรวจคอมไพล์ด้วย `compileExamples` แต่ไม่ลงทะเบียนอัตโนมัติและไม่รวมใน JAR
+
+Backend.start ต้องอ่าน resource ของ binding และคืน Playback ที่ถือ instance ของเอฟเฟกต์นั้น
+update ใช้ Frame ใหม่ ไม่เก็บ world/player เดิมข้ามการเปลี่ยนโลก
+close ของ Playback ต้องหยุดภาพและเสียงที่ผูกอยู่ รวมถึงคืนทรัพยากรตาม API จริง
+Backend.reload ล้าง cache ของไฟล์หลัง handle เดิมถูกปิดแล้ว ไม่สร้างบัฟหรือส่งคำขอร่าย
+
+## เกณฑ์ตรวจรับงานเอฟเฟกต์
+
+- ไม่มี AAA: เปิดเกม/เซิร์ฟเวอร์ได้ สกิลทำงานตามเดิม ไม่มีภาพปลอมที่ทำให้เข้าใจว่ารองรับแล้ว
+- มี AAA/backend/resource: ภาพแต่ละ event เล่นที่ USER/TARGET/HAND/WORLD ถูกคนและถูกมิติ
+- เริ่ม/ยกเลิก/หมดเวลา: loop ไม่ซ้ำและไม่ค้างหลัง STOP แม้หา entity ไม่พบ
+- เข้าเกมระหว่างบัฟทำงาน: คืน loop ด้วย SYNC แต่ไม่เล่น burst/เสียงเปิดสกิลซ้ำ
+- เป้าหมายออฟไลน์/ตาย/กลับมา: เคารพ event lifecycle ไม่ปลดพันธะจากโค้ดภาพ
+- ย้ายมิติ/ออกโลก/เปลี่ยนเซิร์ฟเวอร์: ไม่มี handle ของโลกเดิมค้าง
+- F3+T/ถอด backend: ปิดของเก่าและคืนเฉพาะ loop ปัจจุบัน ไม่คืน one-shot ที่จบแล้ว
+- ไฟล์หาย/JSON ผิด/AAA ไม่รองรับ resource: ข้ามภาพอย่างปลอดภัย ไม่มี log ซ้ำทุกเฟรม
+- ทดสอบ dedicated server โดยไม่มีคลาส AAA/client ถูกโหลดจาก common setup
+- ส่งมอบรุ่น AAA ที่รองรับ dependency จริง backend ไฟล์เอฟเฟกต์ mapping สิทธิ์ไฟล์ และผลทดสอบ

@@ -82,7 +82,7 @@ provider ต้องอ่านค่าอย่างเดียว ห้�
 `ULTIMATE_HIT` เป็น one-shot พร้อม reason `MELEE_CURSE` หรือ `NILAKAN_ALL_SPELLS`
 ตัวทำภาพอ่าน reason จาก event ได้ แต่ไฟล์ mapping เดิมยังไม่ได้เพิ่มตัวกรอง reason
 ต้องใช้ instance/phase จัดการ loop ห้ามสร้าง loop ค้างจาก one-shot
-ดูรายละเอียด adapter ใน `SKILL_EFFECT_ADAPTER_TH.md` และตัวอย่างใน `tools/`
+ดูรายละเอียด adapter ใน [Guide เอฟเฟกต์](EFFECTS_INTEGRATION_GUIDE_TH.md) และตัวอย่างใน `docs/examples/`
 ยังไม่ได้ใส่ไฟล์เอฟเฟกต์ AAA จริง ไอคอนดีบัฟใช้ภาพเดิมเป็น placeholder
 มี mapping ปิดไว้ใน `assets/thida/thida_effects/mayarom.json` สำหรับภาพรอบตัวและภาพเมื่อโจมตี
 คนทำเอฟเฟกต์เปลี่ยน resource เป็นของจริง ติดตั้ง backend และเปิด enabled ได้ตามระบบเดิม
