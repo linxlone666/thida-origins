@@ -1,12 +1,11 @@
 # Thida Origins
 
-Minecraft Origins mod. Current source: **0.8.9-neoforge-dev** for **Minecraft 1.21.1, NeoForge 21.1.233, Java 21**.
+Minecraft Origins mod for **Minecraft 1.21.1, NeoForge 21.1.233, Java 21**.
 
-ม็อด Origin ธิดา — ซอร์สปัจจุบัน 0.8.9 พร้อมเอกสารสำหรับพัฒนาต่อ
+ม็อด Origin ธิดา พร้อมเอกสารสำหรับพัฒนาต่อ เลขเวอร์ชันม็อดกำหนดใน [gradle.properties](gradle.properties) ที่ค่า `mod_version`
 
 ## Downloads
 
-- [Latest archived JAR: 0.8.9](archive/versions/0.8.9-neoforge-dev/thida-origins-1.21.1-neoforge-0.8.9-neoforge-dev.jar)
 - [Original release artifacts, notes and checksums](archive/versions/)
 
 See [archive notes](archive/README.md) when inspecting an older release.
