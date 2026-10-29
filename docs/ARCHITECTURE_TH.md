@@ -1,4 +1,4 @@
-# โครงสร้างโปรเจกต์ 0.9.0-mayarom-dev
+# โครงสร้างโปรเจกต์
 
 เริ่มเชื่อมม็อดภายนอกที่ [Guide พลังเวทย์](MAGIC_INTEGRATION_GUIDE_TH.md)
 หรือ [Guide เอฟเฟกต์](EFFECTS_INTEGRATION_GUIDE_TH.md) บันทึกรุ่นเก่าอยู่ใน `history/`
@@ -38,6 +38,7 @@ Payment ของ resolution เป็น one-shot และกัน reentrant 
 คง mixin แก้ AFP, การฮีล, การย้ายหุ่น เพราะยังมีหน้าที่และการทดสอบรองรับ
 ยันต์ domain_talisman เดิมเรียกอัลติใหม่ด้วยสิทธิ์และคูลดาวน์เดียวกับปุ่ม 4
 คลาสและ config โดเมนเก่าบางส่วนยังอยู่เพื่อ compatibility ไม่ใช่จุดให้ผู้ทำเอฟเฟกต์เพิ่มกติกาใหม่
+ตัดเส้นทางกาฝาก/หทัยก่อนย้ายเป็น SavedData ออกจาก ThidaEvents แล้ว ระบบปัจจุบันอยู่ที่ ThidaBonds
 
 ## Static state
 

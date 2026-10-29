@@ -27,6 +27,9 @@ Linux/macOS ใช้ `./gradlew` แทน ผลลัพธ์อยู่ใ
 `build` ตรวจ unit tests และคอมไพล์ตัวอย่างส่งต่อด้วย ส่วน GameTests ต้องรันแยก
 การ build ครั้งแรกต้องดาวน์โหลด dependencies ตาม `build.gradle`
 
+บน Windows ใช้ `tools/Build-NeoForge.ps1 -GameTests` เพื่อ build พร้อม datapack และ GameTests ได้
+เพิ่ม `-Offline` เมื่อมี dependencies ใน cache แล้ว สคริปต์คงค่า JAVA_HOME/GRADLE_USER_HOME ของผู้ใช้และรองรับชื่อโฟลเดอร์ที่มี `&`
+
 แพ็ก source และ JAR ที่ build แล้วไปยังโฟลเดอร์ใหม่:
 
 ```powershell
