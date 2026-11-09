@@ -26,7 +26,7 @@ public final class ThidaPassiveEffects {
     Audience audience(ThidaEffectEvent event);
   }
 
-  private static AudiencePolicy audiencePolicy = event -> Audience.PARTICIPANTS;
+  private static AudiencePolicy audiencePolicy = ThidaPassiveEffects::defaultAudience;
   private static final Map<MinecraftServer, Timeline> SERVERS = new WeakHashMap<>();
   private static final Set<String> PROJECTED =
       Set.of(
@@ -43,7 +43,14 @@ public final class ThidaPassiveEffects {
   private ThidaPassiveEffects() {}
 
   public static void installAudiencePolicy(AudiencePolicy policy) {
-    audiencePolicy = policy == null ? event -> Audience.PARTICIPANTS : policy;
+    audiencePolicy = policy == null ? ThidaPassiveEffects::defaultAudience : policy;
+  }
+
+  private static Audience defaultAudience(ThidaEffectEvent event) {
+    return event.anchor() == ThidaEffectEvent.Anchor.WORLD
+            && event.power().equals(ThidaRuenSaneha.ID)
+        ? Audience.PARTICIPANTS_AND_NEARBY
+        : Audience.PARTICIPANTS;
   }
 
   static String power(String value) {
@@ -139,7 +146,13 @@ public final class ThidaPassiveEffects {
     long now = ThidaBonds.now(server);
     UUID instance = UUID.randomUUID();
     UUID activation = instance;
-    if (event.equals("SPELL_CAST"))
+    if (event.equals("RUEN_MEMBER_SELECTED"))
+      activation =
+          ThidaBondData.get(server)
+              .player(ownerId)
+              .getCompound(ThidaRuenSaneha.RECORD)
+              .getUUID("activation");
+    else if (event.equals("SPELL_CAST"))
       activation =
           identity(
               server,
@@ -227,7 +240,7 @@ public final class ThidaPassiveEffects {
     try {
       audience = audiencePolicy.audience(message);
     } catch (RuntimeException ignored) {
-      audience = Audience.PARTICIPANTS;
+      audience = defaultAudience(message);
     }
     if (audience != Audience.TARGET && message.owner() != null) result.add(message.owner());
     if (audience != Audience.OWNER && message.target() != null) result.add(message.target());
@@ -235,8 +248,11 @@ public final class ThidaPassiveEffects {
       for (var viewer : server.getPlayerList().getPlayers()) {
         var point = message.point();
         if (viewer.level().dimension().location().toString().equals(point.dimension())
-            && viewer.distanceToSqr(point.x(), point.y(), point.z()) <= 4096)
-          result.add(viewer.getUUID());
+            && viewer.distanceToSqr(point.x(), point.y(), point.z())
+                <= (message.power().equals(ThidaRuenSaneha.ID)
+                        && message.anchor() == ThidaEffectEvent.Anchor.WORLD
+                    ? ThidaRuenPresentation.VIEW_RADIUS_SQUARED
+                    : 4096)) result.add(viewer.getUUID());
       }
     result.removeIf(id -> server.getPlayerList().getPlayer(id) == null);
     return result;
@@ -328,8 +344,16 @@ public final class ThidaPassiveEffects {
     if (event.endsTick() > 0 && now >= event.endsTick()) return "EXPIRED";
     var owner = event.owner() == null ? null : server.getPlayerList().getPlayer(event.owner());
     var target = event.target() == null ? null : server.getPlayerList().getPlayer(event.target());
-    if (event.owner() != null && owner == null) return "OWNER_OFFLINE";
+    if (!event.power().equals(ThidaRuenSaneha.ID) && event.owner() != null && owner == null)
+      return "OWNER_OFFLINE";
     if (event.target() != null && target == null) return "TARGET_OFFLINE";
+    if (event.power().equals(ThidaRuenSaneha.ID) && event.component().equals("ward")) {
+      if (target != null && !target.isAlive()) return "DEATH";
+      if (target != null
+          && !target.level().dimension().location().toString().equals(event.point().dimension()))
+        return "DIMENSION_CHANGED";
+      return "LEFT_DOMAIN";
+    }
     if (owner != null && !owner.isAlive() || target != null && !target.isAlive()) return "DEATH";
     if (owner != null
         && event.component().equals("attempt")
@@ -349,6 +373,8 @@ public final class ThidaPassiveEffects {
   }
 
   private static String stopEvent(ThidaEffectEvent message) {
+    if (message.power().equals(ThidaRuenSaneha.ID))
+      return message.component().equals("domain") ? "RUEN_DOMAIN_ENDED" : "RUEN_WARD_ENDED";
     return switch (message.component()) {
       case "attempt" -> "NAROTRA_ATTEMPT_ENDED";
       case "spell" -> "SPELL_EFFECT_ENDED";

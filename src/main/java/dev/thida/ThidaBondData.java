@@ -1,5 +1,8 @@
 package dev.thida;
 
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
@@ -10,6 +13,8 @@ import net.minecraft.world.level.saveddata.SavedData;
 /** UUID based world state, including offline players. Never store permissions in an item. */
 public final class ThidaBondData extends SavedData {
   private final CompoundTag players;
+  private final Set<UUID> ruenOwners = new HashSet<>();
+  private final Set<UUID> ruenOwnersView = Collections.unmodifiableSet(ruenOwners);
   private static final Factory<ThidaBondData> FACTORY =
       new Factory<>(() -> new ThidaBondData(new CompoundTag()), ThidaBondData::load);
 
@@ -19,6 +24,25 @@ public final class ThidaBondData extends SavedData {
 
   private ThidaBondData(CompoundTag players) {
     this.players = players;
+    for (String id : players.getAllKeys())
+      if (players.getCompound(id).getCompound(ThidaRuenSaneha.RECORD).hasUUID("activation"))
+        ruenOwners.add(UUID.fromString(id));
+  }
+
+  /** Runtime index rebuilt from the saved records; combat need not scan offline player history. */
+  Set<UUID> ruenOwners() {
+    return ruenOwnersView;
+  }
+
+  void putRuen(UUID owner, CompoundTag domain) {
+    if (domain == null) {
+      player(owner).remove(ThidaRuenSaneha.RECORD);
+      ruenOwners.remove(owner);
+    } else {
+      player(owner).put(ThidaRuenSaneha.RECORD, domain);
+      ruenOwners.add(owner);
+    }
+    setDirty();
   }
 
   public static ThidaBondData get(MinecraftServer server) {

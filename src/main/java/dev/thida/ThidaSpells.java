@@ -105,9 +105,14 @@ public final class ThidaSpells {
     n.putDouble("percent", quote.percent());
     n.putFloat("bleedHp", quote.bleedHp());
     n.putLong("nextBleed", time + 20);
-    ThidaBondData.child(store.player(owner), "spells").put(kind, n);
+    boolean blockedByDomain = kind.equals("nilakan_doll") && ThidaRuenSaneha.warded(target);
+    if (!blockedByDomain) ThidaBondData.child(store.player(owner), "spells").put(kind, n);
     store.player(owner).putLong(cd(kind, spell), time + 200);
     store.setDirty();
+    if (blockedByDomain) {
+      ThidaEvents.tell(owner, ThidaMessages.text("message.thida.ruen.blocked_spell"));
+      return;
+    }
     if (kind.equals("narotra_doll") && spell == 1) ThidaEvents.cleanse(target);
     if (kind.equals("narotra_doll") && spell == 2)
       ThidaHealing.apply(owner, target, quote.healHp(), ThidaHealing.Kind.SKILL);
@@ -242,6 +247,16 @@ public final class ThidaSpells {
 
   public static boolean warded(ServerPlayer target) {
     return percent(target, "narotra_doll", 1) > -1;
+  }
+
+  static void cleanseNilakan(ServerPlayer target) {
+    var store = ThidaBondData.get(target.server);
+    for (String id : store.ids()) {
+      UUID owner = UUID.fromString(id);
+      var n = store.player(owner).getCompound("spells").getCompound("nilakan_doll");
+      if (n.hasUUID("target") && n.getUUID("target").equals(target.getUUID()))
+        stop(target.server, owner, "nilakan_doll", "CLEANSED");
+    }
   }
 
   public static void cleanseBleed(ServerPlayer target) {

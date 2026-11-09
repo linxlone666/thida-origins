@@ -380,21 +380,6 @@ public final class ThidaGameTests {
   }
 
   @GameTest(template = "empty")
-  public static void domainReducesDamageToThirtyPercent(GameTestHelper h) {
-    run(
-        h,
-        f -> {
-          FakePlayer p = f.player(true);
-          near(
-              h, ThidaConfig.DOMAIN_REDUCTION.get(), 0.7, "Test requires default domain reduction");
-          use(h, p, "domain_talisman");
-          LivingIncomingDamageEvent event = incoming(p, p.damageSources().generic(), 10);
-          NeoForge.EVENT_BUS.post(event);
-          near(h, event.getAmount(), 3, "Domain must multiply incoming damage by .3");
-        });
-  }
-
-  @GameTest(template = "empty")
   public static void nilakanBothModes(GameTestHelper h) {
     run(
         h,
@@ -646,87 +631,6 @@ public final class ThidaGameTests {
   }
 
   @GameTest(template = "empty")
-  public static void domainStationaryAndCooldownAfterExpiry(GameTestHelper h) {
-    run(
-        h,
-        f -> {
-          FakePlayer owner = f.player(true);
-          use(h, owner, "domain_talisman");
-          long time = owner.level().getGameTime();
-          near(h, state(owner).getLong("domain") - time, 6000, "Domain lasts five minutes");
-          h.assertTrue(state(owner).getBoolean("domainFx"), "Cast starts domain visual lifecycle");
-          for (long age : new long[] {0, 20, 56, 60, 80}) {
-            state(owner).putLong("domainStarted", time - age);
-            tick(owner);
-          }
-          near(
-              h,
-              state(owner).getLong("cd_domain_talisman") - time,
-              30000,
-              "Next cast is twenty-five minutes later");
-          owner.setPos(owner.getX() + 40, owner.getY(), owner.getZ());
-          LivingIncomingDamageEvent hit = incoming(owner, owner.damageSources().generic(), 10);
-          NeoForge.EVENT_BUS.post(hit);
-          near(h, hit.getAmount(), 10, "Domain must not follow caster");
-          state(owner).putLong("domain", time);
-          tick(owner);
-          h.assertTrue(!state(owner).getBoolean("domainFx"), "Expiry closes visual lifecycle");
-          var stack = owner.getMainHandItem();
-          h.assertTrue(
-              stack.use(owner.level(), owner, InteractionHand.MAIN_HAND).getResult()
-                  == InteractionResult.FAIL,
-              "Cooldown still applies after expiry");
-        });
-  }
-
-  @GameTest(template = "empty")
-  public static void domainCursePreservesSingleManualMark(GameTestHelper h) {
-    run(
-        h,
-        f -> {
-          FakePlayer owner = f.player(true),
-              ally = f.player(false),
-              marked = f.player(false),
-              victim = f.player(false);
-          state(owner).putUUID("narotra_doll", ally.getUUID());
-          state(owner).putUUID("nilakan_doll", marked.getUUID());
-          use(h, owner, "domain_talisman");
-          tick(owner);
-          h.assertTrue(
-              ally.hasEffect(MobEffects.DAMAGE_BOOST), "Domain strengthens linked Narotra player");
-          h.assertTrue(
-              victim.hurt(victim.damageSources().playerAttack(ally), 2),
-              "Real linked ally hit lands");
-          h.assertTrue(
-              state(owner).getUUID("nilakan_doll").equals(marked.getUUID()),
-              "Domain must not replace manual mark");
-          h.assertTrue(
-              victim.hasEffect(MobEffects.BLINDNESS)
-                  && victim.hasEffect(MobEffects.WEAKNESS)
-                  && state(victim).getLong("vulnerableUntil") > victim.level().getGameTime(),
-              "Domain applies all three curses");
-          long now = victim.level().getGameTime();
-          for (String key : new String[] {"weakUntil", "slow", "bleed", "vulnerableUntil"})
-            near(h, state(victim).getLong(key) - now, 400, "Domain duration: " + key);
-          near(
-              h,
-              victim.getAttributeValue(Attributes.ATTACK_SPEED),
-              2,
-              "Domain halves attack speed");
-          var incoming = incoming(victim, victim.damageSources().generic(), 10);
-          NeoForge.EVENT_BUS.post(incoming);
-          near(
-              h,
-              incoming.getAmount(),
-              10 * (1 + ThidaConfig.VULNERABILITY.get()),
-              "Domain vulnerability increases incoming damage");
-          var outgoing = incoming(marked, marked.damageSources().playerAttack(victim), 10);
-          NeoForge.EVENT_BUS.post(outgoing);
-          near(h, outgoing.getAmount(), 7, "Domain weakness reduces outgoing damage");
-        });
-  }
-
-  @GameTest(template = "empty")
   public static void persistentMarksSurviveLogoutAndRejectReplacement(GameTestHelper h) {
     run(
         h,
@@ -791,31 +695,262 @@ public final class ThidaGameTests {
   }
 
   @GameTest(template = "empty")
-  public static void hudDomainAndGazeProgress(GameTestHelper h) {
+  public static void ruenPermissionActivationAndExpiry(GameTestHelper h) {
     run(
         h,
         f -> {
-          FakePlayer owner = f.player(true), target = f.player(false);
-          state(owner).putInt("gaze", 120);
-          state(owner).putUUID("gazeTarget", target.getUUID());
-          use(h, owner, "domain_talisman");
-          var data = ThidaEvents.hudSnapshot(owner);
-          near(h, data.getLong("domain"), 6000, "HUD domain active countdown");
+          var owner = f.player(true);
+          var stranger = f.player(false);
+          h.assertTrue(!ThidaRuenSaneha.start(owner), "Locked Origin cannot activate");
+          ThidaBonds.data(stranger).putBoolean("unlock4", true);
+          h.assertTrue(
+              !ThidaRuenSaneha.start(stranger), "Permission flag alone cannot grant the skill");
+
+          unlockRuen(h, owner);
+          owner.addEffect(new MobEffectInstance(MobEffects.POISON, 100));
+          var domain = openRuen(h, owner);
+          long now = ThidaBonds.now(owner.server);
+          near(h, domain.getLong("ends") - now, 6000, "Active window");
+          near(h, ThidaRuenSaneha.center(domain).y, owner.getY(), "Center is on floor");
+          h.assertTrue(!owner.hasEffect(MobEffects.POISON), "Opening cleanses owner");
+          h.assertTrue(
+              !owner.addEffect(new MobEffectInstance(MobEffects.POISON, 100)),
+              "Ward prevents new debuff");
+          near(h, ThidaEvents.hudSnapshot(owner).getLong("domain"), 6000, "HUD countdown");
           near(
               h,
-              data.getCompound("cooldowns").getLong("cd_domain_talisman"),
-              30000,
-              "HUD domain readiness deadline");
-          near(h, data.getInt("gaze"), 120, "HUD gaze progress");
-          h.assertTrue(
-              data.getString("gazeName").equals(target.getScoreboardName())
-                  && data.getBoolean("inDomain"),
-              "HUD target gaze and inside-domain status");
-          owner.setPos(owner.getX() + 40, owner.getY(), owner.getZ());
+              ThidaEvents.hudSnapshot(owner).getCompound("cooldowns").getLong("cd_domain_talisman"),
+              0,
+              "Cooldown has not started");
+
+          var origin = owner.position();
+          owner.setPos(origin.add(0, 101, 0));
           h.assertTrue(
               !ThidaEvents.hudSnapshot(owner).getBoolean("inDomain"),
-              "HUD reflects leaving fixed domain");
+              "Height counts toward radius");
+          domain.putLong("ends", now);
+          ThidaRuenSaneha.tick(owner.server);
+          h.assertTrue(ThidaRuenSaneha.domain(owner).isEmpty(), "Expiry clears domain record");
+          near(
+              h,
+              ThidaBonds.data(owner).getLong(ThidaRuenSaneha.CD) - now,
+              24000,
+              "Expiry starts cooldown");
+          h.assertTrue(!ThidaRuenSaneha.start(owner), "Cannot start during cooldown");
         });
+  }
+
+  @GameTest(template = "empty")
+  public static void ruenRosterQuotaAndVisibility(GameTestHelper h) {
+    run(
+        h,
+        f -> {
+          var owner = f.player(true);
+          unlockRuen(h, owner);
+          var domain = openRuen(h, owner);
+          var original = owner.position();
+          var target = f.player(false);
+          target.setPos(original.add(0, 0, 6));
+          owner.setYRot(0);
+          owner.setXRot(0);
+          target.setInvisible(true);
+          pickRuen(owner, domain, "inside");
+          h.assertTrue(domain.getCompound("inside").isEmpty(), "Invisible target rejected");
+          target.setInvisible(false);
+          var wall = BlockPos.containing(owner.getEyePosition().add(0, 0, 3));
+          var old = owner.level().getBlockState(wall);
+          try {
+            owner
+                .level()
+                .setBlockAndUpdate(
+                    wall, net.minecraft.world.level.block.Blocks.STONE.defaultBlockState());
+            pickRuen(owner, domain, "inside");
+            h.assertTrue(domain.getCompound("inside").isEmpty(), "Wall blocks selection");
+          } finally {
+            owner.level().setBlockAndUpdate(wall, old);
+          }
+          pickRuen(owner, domain, "inside");
+          h.assertTrue(
+              domain.getCompound("inside").contains(target.getStringUUID()),
+              "Visible player selected");
+          pickRuen(owner, domain, "outside");
+          h.assertTrue(
+              domain.getCompound("outside").isEmpty(),
+              "Cannot switch a selected player to the other side");
+          target.setPos(original.add(101, 0, 0));
+          for (int i = 1; i <= 5; i++) {
+            var candidate = f.player(false);
+            candidate.setPos(original.add(0, 0, 6));
+            pickRuen(owner, domain, "inside");
+            if (i == 5)
+              h.assertTrue(
+                  !domain.getCompound("inside").contains(candidate.getStringUUID()),
+                  "Leaving the dome does not free a slot for a sixth member");
+            candidate.setPos(original.add(101, 0, 0));
+          }
+          near(h, domain.getCompound("inside").size(), 5, "Inside quota");
+          for (int i = 0; i < 6; i++) {
+            var candidate = f.player(false);
+            candidate.setPos(original.add(0, 0, 6));
+            pickRuen(owner, domain, "outside");
+            if (i == 5)
+              h.assertTrue(
+                  !domain.getCompound("outside").contains(candidate.getStringUUID()),
+                  "Outside quota");
+            else {
+              h.assertTrue(!ThidaRuenSaneha.warded(candidate), "Outsiders have no ward");
+              var hit = incoming(candidate, owner.damageSources().generic(), 10);
+              NeoForge.EVENT_BUS.post(hit);
+              near(h, hit.getAmount(), 10, "Outside roster has no combat effect");
+            }
+            candidate.setPos(original.add(101, 0, 0));
+          }
+          near(h, domain.getCompound("outside").size(), 5, "Outside quota");
+        });
+  }
+
+  @GameTest(template = "empty")
+  public static void ruenReentryAndIndependentWardClocks(GameTestHelper h) {
+    run(
+        h,
+        f -> {
+          var owner = f.player(true);
+          unlockRuen(h, owner);
+          var domain = openRuen(h, owner);
+          var first = f.player(false);
+          var second = f.player(false);
+          var ownerPosition = owner.position();
+          var inside = ownerPosition.add(0, 0, 6);
+          var outside = ownerPosition.add(0, 101, 0);
+          first.setPos(inside);
+          second.setPos(outside);
+          owner.setYRot(0);
+          owner.setXRot(0);
+          first.addEffect(new MobEffectInstance(MobEffects.POISON, 200));
+          pickRuen(owner, domain, "inside");
+          long now = ThidaBonds.now(owner.server);
+          var members = domain.getCompound("inside");
+          near(
+              h,
+              members.getLong(first.getStringUUID()),
+              now,
+              "First member starts ward at selection");
+          h.assertTrue(!first.hasEffect(MobEffects.POISON), "Selection cleanses");
+          h.assertTrue(
+              !first.addEffect(new MobEffectInstance(MobEffects.POISON, 100)),
+              "Ward rejects new effect");
+          double base = Attributes.MOVEMENT_SPEED.value().getDefaultValue();
+          near(h, first.getAttributeValue(Attributes.MOVEMENT_SPEED), base * 1.6, "Speed III");
+          var hit = incoming(first, owner.damageSources().playerAttack(owner), 10);
+          NeoForge.EVENT_BUS.post(hit);
+          near(h, hit.getAmount(), 6, "+20% outgoing and -50% incoming multiply");
+
+          first.setPos(outside);
+          tick(first);
+          near(
+              h,
+              first.getAttributeValue(Attributes.MOVEMENT_SPEED),
+              base,
+              "Leaving removes movement bonus");
+          h.assertTrue(
+              first.addEffect(new MobEffectInstance(MobEffects.POISON, 100)), "No ward outside");
+          first.setPos(inside);
+          tick(first);
+          h.assertTrue(first.hasEffect(MobEffects.POISON), "Reentry does not cleanse again");
+          h.assertTrue(ThidaRuenSaneha.warded(first), "Remaining ward resumes");
+          near(h, first.getAttributeValue(Attributes.MOVEMENT_SPEED), base * 1.6, "Speed resumes");
+          near(h, members.getLong(first.getStringUUID()), now, "Reentry does not reset ward");
+
+          first.setPos(outside);
+          long later = now + ThidaRuenSaneha.WARD;
+          var clock = owner.server.getWorldData().overworldData();
+          clock.setGameTime(later);
+          try {
+            second.setPos(inside);
+            pickRuen(owner, domain, "inside");
+            near(h, members.getLong(first.getStringUUID()), now, "First ward deadline unchanged");
+            near(
+                h,
+                members.getLong(second.getStringUUID()),
+                later,
+                "Second member has its own clock");
+            first.setPos(ownerPosition.add(2, 0, 6));
+            tick(first);
+            h.assertTrue(!ThidaRuenSaneha.warded(first), "Expired ward does not resume");
+            h.assertTrue(ThidaRuenSaneha.warded(second), "Second member still protected");
+            near(
+                h,
+                first.getAttributeValue(Attributes.MOVEMENT_SPEED),
+                base * 1.6,
+                "Other buffs outlast ward");
+
+            f.offline(owner);
+            ThidaRuenSaneha.tick(owner.server);
+            h.assertTrue(ThidaRuenSaneha.warded(second), "Domain persists with caster offline");
+            var point = ThidaRuenSaneha.center(domain);
+            owner.setPos(outside);
+            f.online(owner);
+            h.assertTrue(
+                point.equals(ThidaRuenSaneha.center(ThidaRuenSaneha.domain(owner))),
+                "Domain stays fixed after reconnect");
+            use(h, owner, "domain_talisman");
+            near(
+                h,
+                ThidaBonds.data(owner).getLong(ThidaRuenSaneha.CD) - later,
+                24000,
+                "Cancel starts cooldown");
+            near(
+                h,
+                second.getAttributeValue(Attributes.MOVEMENT_SPEED),
+                base,
+                "Cancel removes allied speed");
+            h.assertTrue(!ThidaRuenSaneha.warded(second), "Cancel removes allied ward");
+          } finally {
+            clock.setGameTime(now);
+          }
+        });
+  }
+
+  private static void unlockRuen(GameTestHelper h, ServerPlayer owner) {
+    String cmd = "thida unlock " + owner.getScoreboardName() + " skill4";
+    var dispatcher = owner.server.getCommands().getDispatcher();
+    try {
+      dispatcher.execute(
+          cmd, owner.createCommandSourceStack().withPermission(0).withSuppressedOutput());
+      h.fail("Non-operator cannot unlock");
+    } catch (com.mojang.brigadier.exceptions.CommandSyntaxException expected) {
+      h.assertTrue(
+          !ThidaPermissions.unlocked(owner, 4), "Denied unlock must not mutate permission");
+    }
+    try {
+      dispatcher.execute(
+          cmd, owner.createCommandSourceStack().withPermission(2).withSuppressedOutput());
+    } catch (com.mojang.brigadier.exceptions.CommandSyntaxException failure) {
+      throw new AssertionError(failure);
+    }
+    h.assertTrue(ThidaPermissions.unlocked(owner, 4), "Operator unlocks Skill 4");
+  }
+
+  private static CompoundTag openRuen(GameTestHelper h, FakePlayer owner) {
+    var ground = BlockPos.containing(owner.position().add(0, -.5, 0));
+    var original = owner.level().getBlockState(ground);
+    try {
+      owner
+          .level()
+          .setBlockAndUpdate(
+              ground, net.minecraft.world.level.block.Blocks.STONE.defaultBlockState());
+      use(h, owner, "domain_talisman");
+      return ThidaRuenSaneha.domain(owner);
+    } finally {
+      owner.level().setBlockAndUpdate(ground, original);
+    }
+  }
+
+  private static void pickRuen(ServerPlayer owner, CompoundTag domain, String side) {
+    var request = new CompoundTag();
+    request.putString("action", "ruen_pick_" + side);
+    request.putUUID("activation", domain.getUUID("activation"));
+    ThidaBonds.request(owner, request);
   }
 
   @GameTest(template = "empty")
@@ -828,7 +963,8 @@ public final class ThidaGameTests {
           state(owner).putUUID("heart", target.getUUID());
           state(owner).putBoolean("heartUsed", true);
           long now = owner.level().getGameTime();
-          state(owner).putLong("domain", now + 6000);
+          unlockRuen(h, owner);
+          openRuen(h, owner);
           state(owner).putLong("cd_domain_talisman", now + 30000);
           state(owner).putLong("cd_effect_nilakan_doll_0", now + 600);
           state(owner).putLong("hud_effect_nilakan_doll_0", now + 400);
@@ -862,7 +998,11 @@ public final class ThidaGameTests {
                   && state(owner).hasUUID("heart")
                   && state(owner).getBoolean("heartUsed"),
               "Reset preserves links and consumed protection");
-          near(h, state(owner).getLong("domain"), now + 6000, "Reset preserves active domain");
+          near(
+              h,
+              ThidaRuenSaneha.domain(owner).getLong("ends"),
+              now + 6000,
+              "Reset preserves active domain");
           near(
               h,
               state(owner).getLong("hud_effect_nilakan_doll_0"),
@@ -1051,11 +1191,21 @@ public final class ThidaGameTests {
       return p;
     }
 
+    void offline(ServerPlayer p) {
+      serverPlayers.remove(p);
+      uuidIndex.remove(p.getUUID(), p);
+    }
+
+    void online(ServerPlayer p) {
+      serverPlayers.add(p);
+      uuidIndex.put(p.getUUID(), p);
+    }
+
     @Override
     public void close() {
       for (FakePlayer p : players) {
-        serverPlayers.remove(p);
-        uuidIndex.remove(p.getUUID(), p);
+        ThidaRuenSaneha.debugEnd(p);
+        offline(p);
         factoryCache.entrySet().removeIf(entry -> entry.getValue() == p);
         p.getPersistentData().remove("thida_state");
         p.removeTag("thida_origin");

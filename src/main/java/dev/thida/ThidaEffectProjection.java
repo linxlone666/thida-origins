@@ -20,6 +20,14 @@ final class ThidaEffectProjection {
     for (String id : store.ids()) {
       UUID ownerId = UUID.fromString(id);
       var owner = server.getPlayerList().getPlayer(ownerId);
+      ThidaRuenPresentation.project(
+          result,
+          server,
+          epoch,
+          ownerId,
+          owner,
+          store.player(ownerId).getCompound(ThidaRuenSaneha.RECORD),
+          now);
       if (owner != null) {
         var root = ThidaEvents.state(owner);
         if (root.hasUUID("gazeTarget")) {

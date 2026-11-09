@@ -8,16 +8,12 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResultHolder;
-import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.effect.MobEffectCategory;
 import net.minecraft.world.effect.MobEffectInstance;
-import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -75,11 +71,7 @@ public final class ThidaEvents {
         if (passive(key)) ThidaPassives.unlink(p, key, "DEBUG_END");
         else release(p, key);
       }
-    if (n.getLong("domain") > now(p)) {
-      closeDomainFx(p);
-      n.remove("domain");
-      n.putLong("cd_domain_talisman", now(p) + ThidaConfig.DOMAIN_COOLDOWN.get() * 20L);
-    }
+    ThidaRuenSaneha.debugEnd(p);
     n.remove("parasiteReward");
     n.remove("gaze");
     n.remove("gazeTarget");
@@ -96,10 +88,6 @@ public final class ThidaEvents {
     return e.level().getGameTime();
   }
 
-  private static int seconds() {
-    return Math.max(1, ThidaConfig.EFFECT_SECONDS.get()) * 20;
-  }
-
   static String id(ItemStack stack) {
     ResourceLocation key = BuiltInRegistries.ITEM.getKey(stack.getItem());
     return key != null && key.getNamespace().equals("thida") ? key.getPath() : "";
@@ -107,11 +95,6 @@ public final class ThidaEvents {
 
   static boolean holds(ServerPlayer p, String name) {
     return id(p.getMainHandItem()).equals(name) || id(p.getOffhandItem()).equals(name);
-  }
-
-  private static void effect(
-      LivingEntity e, net.minecraft.core.Holder<MobEffect> effect, int ticks, int amp) {
-    e.addEffect(new MobEffectInstance(effect, ticks, amp));
   }
 
   static void cleanse(LivingEntity e) {
@@ -168,8 +151,6 @@ public final class ThidaEvents {
     }
     if (isThida(p)) {
       data.putInt("releaseTotal", ThidaConfig.RELEASE_COOLDOWN.get() * 20);
-      data.putInt("domainTotal", ThidaConfig.DOMAIN_DURATION.get() * 20);
-      data.putInt("domainCooldownTotal", ThidaConfig.DOMAIN_COOLDOWN.get() * 20);
       for (String key : n.getAllKeys())
         if (key.startsWith("cd_")
             && !key.startsWith("cd_effect_nilakan_doll_")
@@ -187,13 +168,12 @@ public final class ThidaEvents {
         ServerPlayer target = p.server.getPlayerList().getPlayer(n.getUUID("gazeTarget"));
         if (target != null) data.putString("gazeName", target.getScoreboardName());
       }
-      data.putLong("domain", Math.max(0, n.getLong("domain") - now(p)));
-      data.putBoolean("inDomain", inDomain(p, p));
     }
     data.putLong("invulnerable", Math.max(0, n.getLong("invulnerable") - now(p)));
     data.put("cooldowns", cooldowns);
     data.put("activeEffects", activeEffects);
     ThidaBonds.hud(p, data);
+    if (isThida(p)) ThidaRuenSaneha.hud(p, data);
     return data;
   }
 
@@ -277,65 +257,9 @@ public final class ThidaEvents {
       return InteractionResultHolder.fail(stack);
     }
     if (passive(item)) return InteractionResultHolder.pass(stack);
-    if (n.getLong("cd_" + item) > now(p)) {
-      tell(p, ThidaMessages.text("ui.thida.events.use.4"));
-      return InteractionResultHolder.fail(stack);
-    }
-    switch (item) {
-      case "domain_talisman" -> {
-        if (n.getLong("domain") > now(p)) return InteractionResultHolder.fail(stack);
-        n.putLong("domain", now(p) + ThidaConfig.DOMAIN_DURATION.get() * 20L);
-        n.putDouble("domainX", p.getX());
-        n.putDouble("domainY", p.getY());
-        n.putDouble("domainZ", p.getZ());
-        n.putString("domainDimension", p.level().dimension().location().toString());
-        n.putLong("domainStarted", now(p));
-        n.putBoolean("domainFx", true);
-        ThidaDomainFx.open(p.serverLevel(), domainCenter(p));
-        syncDomainVisual(p, true);
-        n.putLong(
-            "cd_domain_talisman", n.getLong("domain") + ThidaConfig.DOMAIN_COOLDOWN.get() * 20L);
-        return InteractionResultHolder.success(stack);
-      }
-      default -> {
-        return InteractionResultHolder.pass(stack);
-      }
-    }
-  }
-
-  private static void curse(ServerPlayer p, int mode) {
-    if (ThidaBonds.warded(p)) return;
-    if (mode == 1) {
-      state(p).putLong("bleed", now(p) + seconds());
-      effect(p, MobEffects.BLINDNESS, seconds(), 0);
-    } else if (mode == 0) {
-      effect(p, MobEffects.WEAKNESS, seconds(), 1);
-      state(p).putLong("weakUntil", now(p) + seconds());
-      slow(p, seconds());
-    } else state(p).putLong("vulnerableUntil", now(p) + seconds());
-  }
-
-  private static void slow(ServerPlayer p, int duration) {
-    state(p).putLong("slow", now(p) + duration);
-    var attribute = p.getAttribute(Attributes.ATTACK_SPEED);
-    if (attribute != null && attribute.getModifier(SLOW) == null)
-      attribute.addTransientModifier(
-          new AttributeModifier(SLOW, -0.5, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL));
-  }
-
-  private static boolean inDomain(ServerPlayer owner, Entity target) {
-    return isThida(owner)
-        && state(owner).getLong("domain") > now(owner)
-        && state(owner)
-            .getString("domainDimension")
-            .equals(target.level().dimension().location().toString())
-        && target.position().distanceToSqr(domainCenter(owner))
-            <= Math.pow(ThidaConfig.DOMAIN_RADIUS.get(), 2);
-  }
-
-  private static Vec3 domainCenter(ServerPlayer p) {
-    CompoundTag n = state(p);
-    return new Vec3(n.getDouble("domainX"), n.getDouble("domainY"), n.getDouble("domainZ"));
+    return item.equals("domain_talisman") && ThidaRuenSaneha.useTalisman(p)
+        ? InteractionResultHolder.success(stack)
+        : InteractionResultHolder.fail(stack);
   }
 
   @SubscribeEvent
@@ -354,9 +278,6 @@ public final class ThidaEvents {
     if (event.getSource().getEntity() instanceof ServerPlayer attacker
         && state(attacker).getLong("weakUntil") > now(attacker))
       event.setAmount(event.getAmount() * 0.7F);
-    if (event.getEntity() instanceof ServerPlayer p && inDomain(p, p))
-      event.setAmount(
-          CombatRules.domainDamage(event.getAmount(), 1 - ThidaConfig.DOMAIN_REDUCTION.get()));
   }
 
   @SubscribeEvent(priority = EventPriority.LOWEST)
@@ -365,23 +286,6 @@ public final class ThidaEvents {
     if (state(victim).getLong("invulnerable") > now(victim)) {
       event.setNewDamage(0);
       return;
-    }
-    if (!(event.getSource().getEntity() instanceof ServerPlayer attacker)) return;
-    if (isThida(attacker) && inDomain(attacker, victim)) {
-      effect(victim, MobEffects.WEAKNESS, seconds(), 0);
-      state(victim).putLong("weakUntil", now(victim) + seconds());
-      effect(victim, MobEffects.BLINDNESS, seconds(), 0);
-    }
-    for (ServerPlayer owner : victim.server.getPlayerList().getPlayers()) {
-      if (dollsAllowed(owner)
-          && resolve(owner, "narotra_doll") == attacker
-          && inDomain(owner, attacker)
-          && inDomain(owner, victim)) {
-        // The legacy domain applies temporary curses without changing the manual mark.
-        curse(victim, 0);
-        curse(victim, 1);
-        curse(victim, 2);
-      }
     }
   }
 
@@ -422,78 +326,11 @@ public final class ThidaEvents {
       if (p.isAlive()) addonHeal(p, p, ThidaConfig.PARASITE_BREAK_HEAL.get().floatValue());
     }
     ThidaPassives.tick(p, n, time);
-    ServerPlayer marked = resolve(p, "narotra_doll");
-    if (n.getLong("domain") > time) {
-      if (time % 10 == 0) syncDomainVisual(p, true);
-      if (inDomain(p, p)) cleanse(p);
-      if (marked != null && dollsAllowed(p) && inDomain(p, marked)) {
-        effect(marked, MobEffects.DAMAGE_BOOST, 2, 1);
-        effect(marked, MobEffects.DAMAGE_RESISTANCE, 2, 1);
-      }
-      var domainDimension = ResourceLocation.tryParse(n.getString("domainDimension"));
-      var domainLevel =
-          domainDimension == null
-              ? null
-              : p.server.getLevel(
-                  net.minecraft.resources.ResourceKey.create(
-                      net.minecraft.core.registries.Registries.DIMENSION, domainDimension));
-      if (domainLevel != null)
-        ThidaDomainFx.tick(
-            domainLevel,
-            domainCenter(p),
-            ThidaConfig.DOMAIN_RADIUS.get(),
-            n.contains("domainStarted") ? time - n.getLong("domainStarted") : 80 + time % 20);
-    } else if (n.getBoolean("domainFx")) closeDomainFx(p);
     syncHud(p);
-  }
-
-  private static void closeDomainFx(ServerPlayer p) {
-    CompoundTag n = state(p);
-    syncDomainVisual(p, false);
-    if (!n.getBoolean("domainFx")) return;
-    var dimension = ResourceLocation.tryParse(n.getString("domainDimension"));
-    var level =
-        dimension == null
-            ? null
-            : p.server.getLevel(
-                net.minecraft.resources.ResourceKey.create(
-                    net.minecraft.core.registries.Registries.DIMENSION, dimension));
-    if (level != null) ThidaDomainFx.close(level, domainCenter(p), ThidaConfig.DOMAIN_RADIUS.get());
-    n.remove("domainFx");
-  }
-
-  private static void syncDomainVisual(ServerPlayer p, boolean active) {
-    CompoundTag state = state(p), packet = new CompoundTag();
-    packet.putUUID("owner", p.getUUID());
-    packet.putBoolean("active", active);
-    packet.putString("dimension", state.getString("domainDimension"));
-    Vec3 c = domainCenter(p);
-    double radius = ThidaConfig.DOMAIN_RADIUS.get();
-    packet.putDouble("x", c.x);
-    packet.putDouble("y", c.y);
-    packet.putDouble("z", c.z);
-    packet.putDouble("radius", radius);
-    packet.putLong(
-        "age", state.contains("domainStarted") ? now(p) - state.getLong("domainStarted") : 80);
-    for (ServerPlayer observer : p.server.getPlayerList().getPlayers()) {
-      if (observer instanceof net.neoforged.neoforge.common.util.FakePlayer) continue;
-      if (!active
-          || observer
-                  .level()
-                  .dimension()
-                  .location()
-                  .toString()
-                  .equals(state.getString("domainDimension"))
-              && observer.position().distanceToSqr(c) <= Math.pow(radius + 96, 2)) {
-        net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(
-            observer, new ThidaNetwork.DomainSnapshot(packet));
-      }
-    }
   }
 
   private static void cleanup(ServerPlayer p) {
     ThidaPassives.onOwnerUnavailable(p);
-    closeDomainFx(p);
     for (ServerPlayer other : p.server.getPlayerList().getPlayers()) {
       CompoundTag n = state(other);
       for (String key : new String[] {"heart", "parasite"})

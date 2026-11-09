@@ -3,16 +3,19 @@ package dev.thida;
 import com.mojang.blaze3d.platform.InputConstants;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
+import net.neoforged.neoforge.client.event.InputEvent;
 import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
 import net.neoforged.neoforge.client.settings.KeyConflictContext;
 import org.lwjgl.glfw.GLFW;
@@ -22,6 +25,8 @@ public final class ThidaClient {
   public static final KeyMapping OPEN_MENU = key("open_doll_menu", GLFW.GLFW_KEY_1);
   public static final KeyMapping SUMMON = key("summon_parasite", GLFW.GLFW_KEY_2);
   public static final KeyMapping HEART = key("heart_bond", GLFW.GLFW_KEY_3);
+  public static final KeyMapping ULTIMATE = key("ruen_saneha", GLFW.GLFW_KEY_4);
+  private static RuenPick ruenPick;
   public static final KeyMapping EDIT_HUD = key("edit_hud", GLFW.GLFW_KEY_H);
 
   static {
@@ -45,6 +50,7 @@ public final class ThidaClient {
       e.register(SUMMON);
       e.register(HEART);
       e.register(EDIT_HUD);
+      e.register(ULTIMATE);
     }
   }
 
@@ -68,7 +74,15 @@ public final class ThidaClient {
   @SubscribeEvent
   public static void tick(ClientTickEvent.Pre event) {
     var mc = Minecraft.getInstance();
-    if (mc.player == null || mc.screen != null) return;
+    if (mc.player == null) {
+      ruenPick = null;
+      return;
+    }
+    if (ruenPick != null && !ruenPick.valid(mc)) ruenPick = null;
+    if (mc.screen != null) {
+      ruenPick = null;
+      return;
+    }
     if (!ThidaHudConfig.INPUT_V7.get()) {
       if (OPEN_MENU.getKey().getValue() == GLFW.GLFW_KEY_R) {
         OPEN_MENU.setKey(InputConstants.Type.KEYSYM.getOrCreate(GLFW.GLFW_KEY_1));
@@ -90,9 +104,97 @@ public final class ThidaClient {
       drainConflicts(HEART);
       request("heart", "", 0);
     }
+    if (ULTIMATE.consumeClick()) {
+      while (ULTIMATE.consumeClick()) {}
+      drainConflicts(ULTIMATE);
+      ruenPick = null;
+      var state = ThidaHudState.snapshot();
+      if (mc.screen == null && state.getBoolean("thida")) {
+        if (state.hasUUID("ruenActivation") && ThidaHudState.remaining(state.getLong("domain")) > 0)
+          ruenMenu(mc, state);
+        else request("ruen_start", "", 0);
+      }
+    }
     while (EDIT_HUD.consumeClick()) {
       drainConflicts(EDIT_HUD);
       mc.setScreen(new ThidaBondHud.PositionScreen(null));
+    }
+  }
+
+  private record RuenPick(
+      UUID activation, String action, net.minecraft.client.multiplayer.ClientLevel level) {
+    boolean valid(Minecraft mc) {
+      var data = ThidaHudState.snapshot();
+      return mc.level == level
+          && mc.player != null
+          && mc.player.isAlive()
+          && !mc.player.isSpectator()
+          && data.hasUUID("ruenActivation")
+          && data.getUUID("ruenActivation").equals(activation)
+          && ThidaHudState.remaining(data.getLong("domain")) > 0;
+    }
+  }
+
+  private static void ruenMenu(Minecraft mc, CompoundTag state) {
+    UUID activation = state.getUUID("ruenActivation");
+    var rows = new ArrayList<Choice>();
+    for (String side : List.of("inside", "outside")) {
+      int count = state.getInt(side.equals("inside") ? "ruenInside" : "ruenOutside");
+      rows.add(
+          new Choice(
+              side.equals("inside") ? "heart" : "weak",
+              ThidaMessages.text("message.thida.ruen." + side) + " " + count + "/5",
+              count >= 5 ? ThidaMessages.text("message.thida.ruen.full") : "",
+              () -> {
+                mc.setScreen(null);
+                ruenPick = new RuenPick(activation, "ruen_pick_" + side, mc.level);
+                mc.player.displayClientMessage(
+                    ThidaGui.styled(
+                        Component.literal(ThidaMessages.text("message.thida.ruen.aim"))),
+                    true);
+              }));
+    }
+    rows.add(
+        new Choice(
+            "unlink",
+            ThidaMessages.text("message.thida.ruen.cancel"),
+            "",
+            () -> {
+              ruenRequest("ruen_cancel", activation);
+              mc.setScreen(null);
+            }));
+    mc.setScreen(new WheelScreen(null, ThidaMessages.text("message.thida.ruen.title"), rows));
+  }
+
+  private static void ruenRequest(String action, UUID activation) {
+    var request = new CompoundTag();
+    request.putString("action", action);
+    request.putUUID("activation", activation);
+    net.neoforged.neoforge.network.PacketDistributor.sendToServer(
+        new ThidaNetwork.SkillAction(request));
+  }
+
+  @SubscribeEvent(priority = net.neoforged.bus.api.EventPriority.HIGHEST)
+  public static void selectRuenTarget(InputEvent.MouseButton.Pre event) {
+    var mc = Minecraft.getInstance();
+    if (ruenPick == null
+        || mc.screen != null
+        || mc.getOverlay() != null
+        || !mc.mouseHandler.isMouseGrabbed()
+        || event.getButton() != GLFW.GLFW_MOUSE_BUTTON_LEFT
+        || event.getAction() != GLFW.GLFW_PRESS) return;
+    var pick = ruenPick;
+    ruenPick = null;
+    event.setCanceled(true);
+    mc.options.keyAttack.setDown(false);
+    while (mc.options.keyAttack.consumeClick()) {}
+    if (pick.valid(mc)) {
+      // Send the click's facing before asking the server to resolve the ray.
+      var player = mc.player;
+      player.connection.send(
+          new ServerboundMovePlayerPacket.Rot(
+              player.getYRot(), player.getXRot(), player.onGround()));
+      ruenRequest(pick.action(), pick.activation());
     }
   }
 

@@ -41,6 +41,7 @@ Add `-Offline` after dependencies have been cached. The helper respects existing
 - `1`: doll/spell menu; mouse wheel selects, left click confirms, right click/Esc returns.
 - `2`: parasite doll action.
 - `3`: heart bond action.
+- `4`: start Ruen Saneha or open its faction menu once active. An operator must unlock Skill 4.
 - `H`: separate HUD editor; drag panels and adjust their scale.
 
 Keys can be changed in Minecraft Controls. Keep client and server mod versions compatible.
@@ -48,6 +49,7 @@ Keys can be changed in Minecraft Controls. Keep client and server mod versions c
 ## Documentation
 
 - [Skill specifications (Thai)](docs/SKILLS_V7_TH.md)
+- [Ruen Saneha controls, rules and effect hooks (Thai)](docs/ULTIMATE_RUEN_SANEHA_TH.md)
 - [Personal magic/stat integration](docs/PERSONAL_MOD_INTEGRATION_TH.md)
 - [Effect adapter handoff](docs/SKILL_EFFECT_ADAPTER_TH.md)
 - [Architecture](docs/ARCHITECTURE_TH.md)

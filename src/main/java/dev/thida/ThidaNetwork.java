@@ -88,7 +88,7 @@ public final class ThidaNetwork {
   }
 
   public static void register(RegisterPayloadHandlersEvent event) {
-    var registrar = event.registrar("10-neoforge");
+    var registrar = event.registrar("11-ruen-saneha");
     registrar.playToServer(
         SkillAction.TYPE,
         SkillAction.CODEC,

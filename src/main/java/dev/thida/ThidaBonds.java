@@ -124,6 +124,8 @@ public final class ThidaBonds {
   public static void request(ServerPlayer p, CompoundTag request) {
     if (!ThidaEvents.isThida(p) || !p.isAlive() || p.isSpectator()) return;
     switch (request.getString("action")) {
+      case "ruen_start", "ruen_cancel", "ruen_pick_inside", "ruen_pick_outside" ->
+          ThidaRuenSaneha.request(p, request);
       case "summon" -> summon(p);
       case "heart" -> requestHeart(p);
       case "confirm" -> confirm(p, request);
@@ -864,7 +866,10 @@ public final class ThidaBonds {
             != net.minecraft.world.effect.MobEffectCategory.HARMFUL) return;
     long time = now(p.server);
     var n = data(p);
-    if (n.getLong("heartWard") > time || n.getLong("parasiteWard") > time || ThidaSpells.warded(p))
+    if (n.getLong("heartWard") > time
+        || n.getLong("parasiteWard") > time
+        || ThidaSpells.warded(p)
+        || ThidaRuenSaneha.warded(p))
       event.setResult(MobEffectEvent.Applicable.Result.DO_NOT_APPLY);
   }
 

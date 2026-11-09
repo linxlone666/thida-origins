@@ -16,7 +16,7 @@ public final class ThidaPermissions {
   public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
     var unlock = Commands.literal("unlock").requires(s -> s.hasPermission(2));
     var player = Commands.argument("player", EntityArgument.player());
-    for (int skill : new int[] {2, 3}) {
+    for (int skill : new int[] {2, 3, 4}) {
       final int id = skill;
       player.then(
           Commands.literal("skill" + skill)
