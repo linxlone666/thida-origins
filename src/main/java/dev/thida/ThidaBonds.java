@@ -124,7 +124,12 @@ public final class ThidaBonds {
   public static void request(ServerPlayer p, CompoundTag request) {
     if (!ThidaEvents.isThida(p) || !p.isAlive() || p.isSpectator()) return;
     switch (request.getString("action")) {
-      case "ruen_start", "ruen_cancel", "ruen_pick_inside", "ruen_pick_outside" ->
+      case "ruen_start",
+              "ruen_cancel",
+              "ruen_roster",
+              "ruen_list_pick",
+              "ruen_pick_inside",
+              "ruen_pick_outside" ->
           ThidaRuenSaneha.request(p, request);
       case "summon" -> summon(p);
       case "heart" -> requestHeart(p);

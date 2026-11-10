@@ -5,39 +5,13 @@ import java.util.UUID;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
-import net.neoforged.neoforge.common.util.FakePlayer;
-import net.neoforged.neoforge.network.PacketDistributor;
 
-/** Built-in dome display and AAA integration events; only reads gameplay state. */
+/** Optional AAA integration events; only reads gameplay state. */
 final class ThidaRuenPresentation {
   static final double VIEW_RADIUS_SQUARED =
       (ThidaRuenSaneha.RADIUS + 96) * (ThidaRuenSaneha.RADIUS + 96);
 
   private ThidaRuenPresentation() {}
-
-  static void sync(MinecraftServer server, UUID owner, CompoundTag domain, boolean active) {
-    var packet = new CompoundTag();
-    var center = ThidaRuenSaneha.center(domain);
-    packet.putUUID("owner", owner);
-    packet.putBoolean("active", active);
-    packet.putString("dimension", domain.getString("dimension"));
-    packet.putDouble("x", center.x);
-    packet.putDouble("y", center.y);
-    packet.putDouble("z", center.z);
-    packet.putDouble("radius", ThidaRuenSaneha.RADIUS);
-    packet.putLong("age", ThidaBonds.now(server) - domain.getLong("started"));
-    for (var observer : server.getPlayerList().getPlayers()) {
-      if (observer instanceof FakePlayer
-          || !observer
-              .level()
-              .dimension()
-              .location()
-              .toString()
-              .equals(packet.getString("dimension"))
-          || observer.position().distanceToSqr(center) > VIEW_RADIUS_SQUARED) continue;
-      PacketDistributor.sendToPlayer(observer, new ThidaNetwork.DomainSnapshot(packet));
-    }
-  }
 
   static void project(
       Map<UUID, ThidaEffectEvent> result,

@@ -111,7 +111,7 @@ public final class ThidaClient {
       var state = ThidaHudState.snapshot();
       if (mc.screen == null && state.getBoolean("thida")) {
         if (state.hasUUID("ruenActivation") && ThidaHudState.remaining(state.getLong("domain")) > 0)
-          ruenMenu(mc, state);
+          mc.setScreen(new ThidaRuenMenu(state.getUUID("ruenActivation")));
         else request("ruen_start", "", 0);
       }
     }
@@ -135,43 +135,53 @@ public final class ThidaClient {
     }
   }
 
-  private static void ruenMenu(Minecraft mc, CompoundTag state) {
-    UUID activation = state.getUUID("ruenActivation");
-    var rows = new ArrayList<Choice>();
-    for (String side : List.of("inside", "outside")) {
-      int count = state.getInt(side.equals("inside") ? "ruenInside" : "ruenOutside");
-      rows.add(
-          new Choice(
-              side.equals("inside") ? "heart" : "weak",
-              ThidaMessages.text("message.thida.ruen." + side) + " " + count + "/5",
-              count >= 5 ? ThidaMessages.text("message.thida.ruen.full") : "",
-              () -> {
-                mc.setScreen(null);
-                ruenPick = new RuenPick(activation, "ruen_pick_" + side, mc.level);
-                mc.player.displayClientMessage(
-                    ThidaGui.styled(
-                        Component.literal(ThidaMessages.text("message.thida.ruen.aim"))),
-                    true);
-              }));
-    }
-    rows.add(
-        new Choice(
-            "unlink",
-            ThidaMessages.text("message.thida.ruen.cancel"),
-            "",
-            () -> {
-              ruenRequest("ruen_cancel", activation);
-              mc.setScreen(null);
-            }));
-    mc.setScreen(new WheelScreen(null, ThidaMessages.text("message.thida.ruen.title"), rows));
+  static void armRuenAim(UUID activation, String side) {
+    var mc = Minecraft.getInstance();
+    ruenPick = new RuenPick(activation, "ruen_pick_" + side, mc.level);
   }
 
-  private static void ruenRequest(String action, UUID activation) {
+  static void ruenRequest(String action, UUID activation, String side, UUID target) {
     var request = new CompoundTag();
     request.putString("action", action);
     request.putUUID("activation", activation);
+    request.putString("side", side);
+    if (target != null) request.putUUID("target", target);
     net.neoforged.neoforge.network.PacketDistributor.sendToServer(
         new ThidaNetwork.SkillAction(request));
+  }
+
+  private static net.minecraft.client.player.AbstractClientPlayer ruenAim(Minecraft mc) {
+    var anchor = ThidaHudState.snapshot().getCompound("ruenAnchor");
+    if (mc.player == null
+        || mc.level == null
+        || !mc.level.dimension().location().toString().equals(anchor.getString("dimension")))
+      return null;
+    var center = ThidaRuenSaneha.center(anchor);
+    double reach = anchor.getDouble("reach");
+    return ThidaRuenTargeting.aimed(
+        mc.player,
+        mc.level.players(),
+        reach,
+        target -> ThidaRuenTargeting.eligible(mc.player, target, center, reach));
+  }
+
+  @SubscribeEvent
+  public static void renderRuenAim(net.neoforged.neoforge.client.event.RenderGuiEvent.Post event) {
+    var mc = Minecraft.getInstance();
+    if (ruenPick == null || mc.screen != null || mc.options.hideGui || !ruenPick.valid(mc)) return;
+    var target = ruenAim(mc);
+    var g = event.getGuiGraphics();
+    String text =
+        target == null
+            ? ThidaMessages.text("message.thida.ruen.aim")
+            : ThidaMessages.text(
+                    "message.thida.ruen."
+                        + (ruenPick.action().endsWith("_inside") ? "inside" : "outside"))
+                + ": "
+                + target.getScoreboardName();
+    int room = Math.max(0, g.guiWidth() - 16);
+    int w = Math.min(room, ThidaGui.width(text));
+    ThidaGui.fittedText(g, text, (g.guiWidth() - w) / 2, g.guiHeight() / 2 + 12, w, ThidaGui.TEXT);
   }
 
   @SubscribeEvent(priority = net.neoforged.bus.api.EventPriority.HIGHEST)
@@ -189,12 +199,18 @@ public final class ThidaClient {
     mc.options.keyAttack.setDown(false);
     while (mc.options.keyAttack.consumeClick()) {}
     if (pick.valid(mc)) {
+      var target = ruenAim(mc);
+      if (target == null) {
+        mc.player.displayClientMessage(
+            Component.literal(ThidaMessages.text("message.thida.ruen.no_target")), true);
+        return;
+      }
       // Send the click's facing before asking the server to resolve the ray.
       var player = mc.player;
       player.connection.send(
           new ServerboundMovePlayerPacket.Rot(
               player.getYRot(), player.getXRot(), player.onGround()));
-      ruenRequest(pick.action(), pick.activation());
+      ruenRequest(pick.action(), pick.activation(), "", target.getUUID());
     }
   }
 

@@ -1,8 +1,10 @@
 package dev.thida;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
@@ -14,10 +16,12 @@ import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.common.util.FakePlayer;
 import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 /** The domain belongs to the world clock, not the caster's player entity. */
 @EventBusSubscriber(modid = "thida")
@@ -121,7 +125,6 @@ public final class ThidaRuenSaneha {
     ThidaBondData.get(owner.server).putRuen(owner.getUUID(), domain);
     cleanse(owner);
     refreshSpeed(owner);
-    ThidaRuenPresentation.sync(owner.server, owner.getUUID(), domain, true);
     ThidaPassiveEffects.reconcile(owner.server);
     tell(owner, "started");
     return true;
@@ -151,8 +154,35 @@ public final class ThidaRuenSaneha {
         || !domain.getUUID("activation").equals(request.getUUID("activation"))) return;
     switch (action) {
       case "ruen_cancel" -> cancel(owner);
-      case "ruen_pick_inside" -> select(owner, domain, Side.INSIDE);
-      case "ruen_pick_outside" -> select(owner, domain, Side.OUTSIDE);
+      case "ruen_roster" -> {
+        long now = ThidaBonds.now(owner.server);
+        var state = ThidaEvents.state(owner);
+        if (state.getLong("ruenRosterAt") <= now) {
+          state.putLong("ruenRosterAt", now + 10);
+          sendRoster(owner, domain, "");
+        }
+      }
+      case "ruen_list_pick" -> {
+        Side side =
+            switch (request.getString("side")) {
+              case "inside" -> Side.INSIDE;
+              case "outside" -> Side.OUTSIDE;
+              default -> null;
+            };
+        if (side == null || !request.hasUUID("target")) return;
+        long now = ThidaBonds.now(owner.server);
+        var state = ThidaEvents.state(owner);
+        if (state.getLong("ruenSelectAt") > now) return;
+        state.putLong("ruenSelectAt", now + 5);
+        var target = owner.server.getPlayerList().getPlayer(request.getUUID("target"));
+        if (target != null
+            && (!eligible(owner, domain, target)
+                || !ThidaRuenTargeting.visible(owner, target.getEyePosition()))) target = null;
+        String result = select(owner, domain, side, target);
+        sendRoster(owner, domain, result);
+      }
+      case "ruen_pick_inside" -> selectAimed(owner, domain, Side.INSIDE, request);
+      case "ruen_pick_outside" -> selectAimed(owner, domain, Side.OUTSIDE, request);
       default -> {}
     }
   }
@@ -181,30 +211,38 @@ public final class ThidaRuenSaneha {
       if (player.getUUID().equals(owner)
           || domain.getCompound(Side.INSIDE.key).contains(player.getStringUUID()))
         refreshSpeed(player);
-    ThidaRuenPresentation.sync(server, owner, domain, false);
     ThidaPassiveEffects.end(server, owner, ID, "domain", "RUEN_DOMAIN_ENDED", reason);
     ThidaPassiveEffects.end(server, owner, ID, "ward", "RUEN_WARD_ENDED", reason);
   }
 
-  private static void select(ServerPlayer owner, CompoundTag domain, Side side) {
+  private static void selectAimed(
+      ServerPlayer owner, CompoundTag domain, Side side, CompoundTag request) {
     var target = aimedTarget(owner, domain);
+    if (target != null
+        && request.hasUUID("target")
+        && !request.getUUID("target").equals(target.getUUID())) target = null;
+    select(owner, domain, side, target);
+  }
+
+  private static String select(
+      ServerPlayer owner, CompoundTag domain, Side side, ServerPlayer target) {
     if (target == null) {
       tell(owner, "no_target");
-      return;
+      return "no_target";
     }
     String id = target.getStringUUID();
-    if (domain.getCompound(Side.INSIDE.key).contains(id)
-        || domain.getCompound(Side.OUTSIDE.key).contains(id)) {
+    if (assigned(domain, id)) {
       tell(owner, "already_selected");
-      return;
+      return "already_selected";
     }
     var members = ThidaBondData.child(domain, side.key);
     if (members.size() >= CAPACITY) {
       tell(owner, "full");
-      return;
+      return "full";
     }
     long now = ThidaBonds.now(owner.server);
     members.putLong(id, now);
+    ThidaBondData.child(domain, "names").putString(id, target.getScoreboardName());
     ThidaBondData.get(owner.server).setDirty();
     if (side == Side.INSIDE) {
       cleanse(target);
@@ -224,43 +262,78 @@ public final class ThidaRuenSaneha {
     ThidaEvents.tell(
         owner,
         ThidaMessages.text("message.thida.ruen." + side.key) + ": " + target.getScoreboardName());
+    return "added";
   }
 
-  /** The packet carries only a side and activation ID; the server resolves the crosshair hit. */
+  private static boolean assigned(CompoundTag domain, String id) {
+    return domain.getCompound(Side.INSIDE.key).contains(id)
+        || domain.getCompound(Side.OUTSIDE.key).contains(id);
+  }
+
+  private static double reach(ServerPlayer owner) {
+    return (owner.server.getPlayerList().getViewDistance() + 1) * 16.0;
+  }
+
+  private static boolean eligible(ServerPlayer owner, CompoundTag domain, ServerPlayer target) {
+    return contains(domain, target)
+        && ThidaRuenTargeting.eligible(owner, target, center(domain), reach(owner));
+  }
+
+  private static void sendRoster(ServerPlayer owner, CompoundTag domain, String feedback) {
+    if (owner instanceof FakePlayer) return;
+    var packet = new CompoundTag();
+    packet.putUUID("activation", domain.getUUID("activation"));
+    packet.putString("feedback", feedback);
+    var candidates = new ListTag();
+    owner.server.getPlayerList().getPlayers().stream()
+        .filter(
+            target -> !assigned(domain, target.getStringUUID()) && eligible(owner, domain, target))
+        .filter(target -> ThidaRuenTargeting.visible(owner, target.getEyePosition()))
+        .sorted(
+            Comparator.comparingDouble((ServerPlayer target) -> owner.distanceToSqr(target))
+                .thenComparing(ServerPlayer::getScoreboardName))
+        .forEach(
+            target ->
+                candidates.add(
+                    rosterRow(
+                        target.getUUID(),
+                        target.getScoreboardName(),
+                        (int) Math.round(owner.distanceTo(target)))));
+    packet.put("candidates", candidates);
+    for (Side side : Side.values()) {
+      var members = new ListTag();
+      for (String id : domain.getCompound(side.key).getAllKeys().stream().sorted().toList()) {
+        UUID uuid = UUID.fromString(id);
+        var member = owner.server.getPlayerList().getPlayer(uuid);
+        String name =
+            member != null ? member.getScoreboardName() : domain.getCompound("names").getString(id);
+        if (name.isEmpty() && owner.server.getProfileCache() != null)
+          name =
+              owner.server.getProfileCache().get(uuid).map(profile -> profile.getName()).orElse("");
+        members.add(rosterRow(uuid, name.isEmpty() ? id.substring(0, 8) : name, -1));
+      }
+      packet.put(side.key, members);
+    }
+    PacketDistributor.sendToPlayer(owner, new ThidaNetwork.RuenRoster(packet));
+  }
+
+  private static CompoundTag rosterRow(UUID target, String name, int distance) {
+    var row = new CompoundTag();
+    row.putUUID("id", target);
+    row.putString("name", name);
+    row.putInt("distance", distance);
+    return row;
+  }
+
+  /** Resolve the crosshair independently, then compare with the client's optional preview. */
   private static ServerPlayer aimedTarget(ServerPlayer owner, CompoundTag domain) {
     if (!domain.getString("dimension").equals(owner.level().dimension().location().toString()))
       return null;
-    Vec3 eye = owner.getEyePosition();
-    // No attack-reach limit. Bound the ray to the area the server can send to this client.
-    double reach =
-        Math.min(
-            eye.distanceTo(center(domain)) + RADIUS + 2,
-            (owner.server.getPlayerList().getViewDistance() + 1) * 16.0);
-    Vec3 end = eye.add(owner.getLookAngle().scale(reach));
-    ServerPlayer nearest = null;
-    Vec3 hit = null;
-    double best = reach * reach;
-    for (var target : owner.server.getPlayerList().getPlayers()) {
-      if (target == owner
-          || !target.isAlive()
-          || target.isSpectator()
-          || target.isInvisible()
-          || !contains(domain, target)) continue;
-      var box = target.getBoundingBox();
-      Vec3 candidate = box.contains(eye) ? eye : box.clip(eye, end).orElse(null);
-      if (candidate == null || eye.distanceToSqr(candidate) >= best) continue;
-      best = eye.distanceToSqr(candidate);
-      nearest = target;
-      hit = candidate;
-    }
-    if (hit == null) return null;
-    var obstruction =
-        owner
-            .level()
-            .clip(
-                new ClipContext(
-                    eye, hit, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, owner));
-    return obstruction.getType() == HitResult.Type.MISS ? nearest : null;
+    return ThidaRuenTargeting.aimed(
+        owner,
+        owner.server.getPlayerList().getPlayers(),
+        reach(owner),
+        target -> eligible(owner, domain, target));
   }
 
   private static long selectedAt(CompoundTag domain, UUID owner, ServerPlayer p) {
@@ -344,7 +417,6 @@ public final class ThidaRuenSaneha {
       if (!active(domain, now)) end(server, owner, domain.getLong("ends"), "EXPIRED");
       else if (caster != null && !ThidaPermissions.unlocked(caster, 4))
         end(server, owner, now, "ORIGIN_LOST");
-      else if (now % 10 == 0) ThidaRuenPresentation.sync(server, owner, domain, true);
     }
   }
 
@@ -363,6 +435,11 @@ public final class ThidaRuenSaneha {
       data.putUUID("ruenActivation", domain.getUUID("activation"));
       data.putInt("ruenInside", domain.getCompound(Side.INSIDE.key).size());
       data.putInt("ruenOutside", domain.getCompound(Side.OUTSIDE.key).size());
+      var anchor = new CompoundTag();
+      for (String axis : List.of("x", "y", "z")) anchor.putDouble(axis, domain.getDouble(axis));
+      anchor.putString("dimension", domain.getString("dimension"));
+      anchor.putDouble("reach", reach(owner));
+      data.put("ruenAnchor", anchor);
     }
   }
 

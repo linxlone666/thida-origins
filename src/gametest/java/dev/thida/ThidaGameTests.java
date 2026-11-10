@@ -1011,41 +1011,6 @@ public final class ThidaGameTests {
         });
   }
 
-  @GameTest(template = "empty")
-  public static void domainDisplaySnapshotsExpireAndClose(GameTestHelper h) {
-    ThidaDomainState.clear();
-    try {
-      var first = new CompoundTag();
-      first.putUUID("owner", UUID.randomUUID());
-      first.putBoolean("active", true);
-      first.putLong("age", 100);
-      first.putString("dimension", "minecraft:overworld");
-      first.putDouble("radius", 30);
-      ThidaDomainState.accept(first);
-      var second = first.copy();
-      second.putUUID("owner", UUID.randomUUID());
-      ThidaDomainState.accept(second);
-      h.assertTrue(ThidaDomainState.views().size() == 2, "Overlapping domains remain separate");
-      ThidaDomainState.tick();
-      near(
-          h,
-          ThidaDomainState.age(ThidaDomainState.views().get(0), .5f),
-          101.5,
-          "Animation interpolates between snapshots");
-      first.putBoolean("active", false);
-      ThidaDomainState.accept(first);
-      h.assertTrue(
-          ThidaDomainState.views().size() == 1, "End packet removes only its owner's domain");
-      for (int i = 0; i < 31; i++) ThidaDomainState.tick();
-      h.assertTrue(
-          ThidaDomainState.views().isEmpty(),
-          "Out-of-range or disconnected domain expires without more packets");
-      h.succeed();
-    } finally {
-      ThidaDomainState.clear();
-    }
-  }
-
   private static LivingIncomingDamageEvent incoming(
       net.minecraft.world.entity.LivingEntity entity, DamageSource source, float amount) {
     return new LivingIncomingDamageEvent(entity, new DamageContainer(source, amount));

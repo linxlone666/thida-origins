@@ -44,6 +44,7 @@ public final class ThidaHud {
   @SubscribeEvent
   public static void logout(ClientPlayerNetworkEvent.LoggingOut event) {
     ThidaHudState.accept(new CompoundTag());
+    ThidaHudState.acceptRuen(null);
     previous = null;
     revision = -1;
     noticeTicks = 0;
@@ -87,14 +88,6 @@ public final class ThidaHud {
         return;
       }
     }
-    if (old.getLong("domain") == 0 && next.getLong("domain") > 0) {
-      cue(ThidaMessages.text("ui.thida.hud.detectchanges.3"), SoundEvents.BEACON_ACTIVATE, 1);
-      return;
-    }
-    if (old.getLong("domain") > 0 && next.getLong("domain") == 0) {
-      cue(ThidaMessages.text("ui.thida.hud.detectchanges.4"), SoundEvents.BEACON_DEACTIVATE, 1);
-      return;
-    }
     if (!old.getBoolean("armed") && next.getBoolean("armed")) {
       cue(
           ThidaMessages.text("ui.thida.hud.detectchanges.5"),
@@ -113,7 +106,10 @@ public final class ThidaHud {
     }
     CompoundTag cds = next.getCompound("cooldowns"), prior = old.getCompound("cooldowns");
     for (String key : prior.getAllKeys())
-      if (next.getBoolean("thida") && prior.getLong(key) > 0 && cds.getLong(key) == 0) {
+      if (!key.equals("cd_domain_talisman")
+          && next.getBoolean("thida")
+          && prior.getLong(key) > 0
+          && cds.getLong(key) == 0) {
         cue(
             label(key) + ThidaMessages.text("ui.thida.hud.detectchanges.8"),
             SoundEvents.PLAYER_LEVELUP,

@@ -61,15 +61,15 @@ public final class ThidaNetwork {
     }
   }
 
-  public record DomainSnapshot(CompoundTag data) implements CustomPacketPayload {
-    public static final Type<DomainSnapshot> TYPE = ThidaNetwork.type("domain");
-    public static final StreamCodec<RegistryFriendlyByteBuf, DomainSnapshot> CODEC =
+  public record RuenRoster(CompoundTag data) implements CustomPacketPayload {
+    public static final Type<RuenRoster> TYPE = ThidaNetwork.type("ruen_roster");
+    public static final StreamCodec<RegistryFriendlyByteBuf, RuenRoster> CODEC =
         StreamCodec.of(
             (buffer, message) -> buffer.writeNbt(message.data()),
-            buffer -> new DomainSnapshot(buffer.readNbt()));
+            buffer -> new RuenRoster(buffer.readNbt()));
 
     @Override
-    public Type<DomainSnapshot> type() {
+    public Type<RuenRoster> type() {
       return TYPE;
     }
   }
@@ -88,7 +88,7 @@ public final class ThidaNetwork {
   }
 
   public static void register(RegisterPayloadHandlersEvent event) {
-    var registrar = event.registrar("11-ruen-saneha");
+    var registrar = event.registrar("12-ruen-saneha");
     registrar.playToServer(
         SkillAction.TYPE,
         SkillAction.CODEC,
@@ -117,9 +117,9 @@ public final class ThidaNetwork {
         HudSnapshot.CODEC,
         (message, context) -> context.enqueueWork(() -> ThidaHudState.accept(message.data())));
     registrar.playToClient(
-        DomainSnapshot.TYPE,
-        DomainSnapshot.CODEC,
-        (message, context) -> context.enqueueWork(() -> ThidaDomainState.accept(message.data())));
+        RuenRoster.TYPE,
+        RuenRoster.CODEC,
+        (message, context) -> context.enqueueWork(() -> ThidaHudState.acceptRuen(message.data())));
     registrar.playToClient(
         PassiveEffectEvent.TYPE,
         PassiveEffectEvent.CODEC,
