@@ -103,7 +103,7 @@ public class ThidaHudEditor extends Screen {
     if (selected == Panel.EFFECTS) ThidaHud.previewOutline(g);
     else
       g.renderOutline(
-          area.x() - 2, area.y() - 2, area.width() + 4, area.height() + 4, ThidaGui.GOLD);
+          area.x() - 2, area.y() - 2, area.width() + 4, area.height() + 4, ThidaHudTheme.SELECTION);
     String panel =
         ThidaMessages.text("hud.thida.panel." + selected.name().toLowerCase(java.util.Locale.ROOT));
     String hint =
@@ -121,8 +121,10 @@ public class ThidaHudEditor extends Screen {
             + "   "
             + ThidaMessages.text("hud.thida.editor.hint");
     int hintWidth = Math.min(width - 16, ThidaGui.width(hint) + 16);
-    ThidaGui.hudPanel(g, (width - hintWidth) / 2, height - 47, hintWidth, 16, ThidaGui.GOLD);
-    ThidaGui.text(g, hint, (width - hintWidth) / 2 + 8, height - 43, hintWidth - 16, ThidaGui.TEXT);
+    ThidaHudTheme.panel(
+        g, (width - hintWidth) / 2, height - 47, hintWidth, 16, ThidaHudTheme.ACTIVE);
+    ThidaGui.text(
+        g, hint, (width - hintWidth) / 2 + 8, height - 43, hintWidth - 16, ThidaHudTheme.INK);
     super.render(g, mouseX, mouseY, partial);
   }
 

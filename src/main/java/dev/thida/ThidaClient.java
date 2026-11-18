@@ -52,6 +52,26 @@ public final class ThidaClient {
       e.register(EDIT_HUD);
       e.register(ULTIMATE);
     }
+
+    @SubscribeEvent
+    public static void hideBleedBadges(
+        net.neoforged.neoforge.client.extensions.common.RegisterClientExtensionsEvent event) {
+      event.registerMobEffect(
+          new net.neoforged.neoforge.client.extensions.common.IClientMobEffectExtensions() {
+            @Override
+            public boolean isVisibleInInventory(
+                net.minecraft.world.effect.MobEffectInstance effect) {
+              return false;
+            }
+
+            @Override
+            public boolean isVisibleInGui(net.minecraft.world.effect.MobEffectInstance effect) {
+              return false;
+            }
+          },
+          ThidaMod.SPELL_BLEED,
+          ThidaMod.HEART_BLEED);
+    }
   }
 
   private static void request(String action, String doll, int spell) {
@@ -111,7 +131,7 @@ public final class ThidaClient {
       var state = ThidaHudState.snapshot();
       if (mc.screen == null && state.getBoolean("thida")) {
         if (state.hasUUID("ruenActivation") && ThidaHudState.remaining(state.getLong("domain")) > 0)
-          mc.setScreen(new ThidaRuenMenu(state.getUUID("ruenActivation")));
+          openRuenWheel(mc, state);
         else request("ruen_start", "", 0);
       }
     }
@@ -122,7 +142,7 @@ public final class ThidaClient {
   }
 
   private record RuenPick(
-      UUID activation, String action, net.minecraft.client.multiplayer.ClientLevel level) {
+      UUID activation, String side, net.minecraft.client.multiplayer.ClientLevel level) {
     boolean valid(Minecraft mc) {
       var data = ThidaHudState.snapshot();
       return mc.level == level
@@ -135,9 +155,50 @@ public final class ThidaClient {
     }
   }
 
+  private static void openRuenWheel(Minecraft mc, CompoundTag state) {
+    UUID activation = state.getUUID("ruenActivation");
+    var rows = new ArrayList<Choice>();
+    for (String side : List.of("inside", "outside")) {
+      int count = ruenCount(state, side);
+      rows.add(
+          new Choice(
+              "ruen_" + side,
+              ruenText(side) + " " + count + "/" + ThidaRuenSaneha.CAPACITY,
+              count >= ThidaRuenSaneha.CAPACITY ? ruenText("full") : "",
+              () -> {
+                mc.setScreen(null);
+                armRuenAim(activation, side);
+              }));
+    }
+    rows.add(
+        new Choice(
+            "roster",
+            ruenText("open_roster"),
+            "",
+            () -> mc.setScreen(new ThidaRuenMenu(activation))));
+    rows.add(
+        new Choice(
+            "unlink",
+            ruenText("cancel"),
+            "",
+            () -> {
+              ruenRequest("ruen_cancel", activation, "", null);
+              mc.setScreen(null);
+            }));
+    mc.setScreen(new WheelScreen(null, ruenText("title"), rows));
+  }
+
+  private static String ruenText(String key) {
+    return ThidaMessages.text("message.thida.ruen." + key);
+  }
+
+  private static int ruenCount(CompoundTag data, String side) {
+    return data.getInt(side.equals("inside") ? "ruenInside" : "ruenOutside");
+  }
+
   static void armRuenAim(UUID activation, String side) {
     var mc = Minecraft.getInstance();
-    ruenPick = new RuenPick(activation, "ruen_pick_" + side, mc.level);
+    ruenPick = new RuenPick(activation, side, mc.level);
   }
 
   static void ruenRequest(String action, UUID activation, String side, UUID target) {
@@ -169,19 +230,31 @@ public final class ThidaClient {
   public static void renderRuenAim(net.neoforged.neoforge.client.event.RenderGuiEvent.Post event) {
     var mc = Minecraft.getInstance();
     if (ruenPick == null || mc.screen != null || mc.options.hideGui || !ruenPick.valid(mc)) return;
-    var target = ruenAim(mc);
+    var data = ThidaHudState.snapshot();
+    int count = ruenCount(data, ruenPick.side());
+    var target = count >= ThidaRuenSaneha.CAPACITY ? null : ruenAim(mc);
     var g = event.getGuiGraphics();
     String text =
-        target == null
-            ? ThidaMessages.text("message.thida.ruen.aim")
-            : ThidaMessages.text(
-                    "message.thida.ruen."
-                        + (ruenPick.action().endsWith("_inside") ? "inside" : "outside"))
-                + ": "
-                + target.getScoreboardName();
+        ruenText(ruenPick.side())
+            + " "
+            + count
+            + "/"
+            + ThidaRuenSaneha.CAPACITY
+            + (count >= ThidaRuenSaneha.CAPACITY
+                ? "  " + ruenText("full")
+                : target == null
+                    ? "  " + ruenText("aim")
+                    : ": "
+                        + target.getScoreboardName()
+                        + (data.getCompound("ruenAssigned").contains(target.getStringUUID())
+                            ? "  " + ruenText("assigned_short")
+                            : ""));
     int room = Math.max(0, g.guiWidth() - 16);
     int w = Math.min(room, ThidaGui.width(text));
     ThidaGui.fittedText(g, text, (g.guiWidth() - w) / 2, g.guiHeight() / 2 + 12, w, ThidaGui.TEXT);
+    String exit = ruenText("aim_exit");
+    w = Math.min(room, ThidaGui.width(exit));
+    ThidaGui.fittedText(g, exit, (g.guiWidth() - w) / 2, g.guiHeight() / 2 + 26, w, ThidaGui.MUTED);
   }
 
   @SubscribeEvent(priority = net.neoforged.bus.api.EventPriority.HIGHEST)
@@ -191,26 +264,32 @@ public final class ThidaClient {
         || mc.screen != null
         || mc.getOverlay() != null
         || !mc.mouseHandler.isMouseGrabbed()
-        || event.getButton() != GLFW.GLFW_MOUSE_BUTTON_LEFT
         || event.getAction() != GLFW.GLFW_PRESS) return;
     var pick = ruenPick;
-    ruenPick = null;
+    if (!pick.valid(mc)) {
+      ruenPick = null;
+      return;
+    }
+    if (event.getButton() == GLFW.GLFW_MOUSE_BUTTON_RIGHT) {
+      ruenPick = null;
+      event.setCanceled(true);
+      return;
+    }
+    if (event.getButton() != GLFW.GLFW_MOUSE_BUTTON_LEFT) return;
     event.setCanceled(true);
     mc.options.keyAttack.setDown(false);
     while (mc.options.keyAttack.consumeClick()) {}
-    if (pick.valid(mc)) {
+    var data = ThidaHudState.snapshot();
+    if (ruenCount(data, pick.side()) < ThidaRuenSaneha.CAPACITY) {
       var target = ruenAim(mc);
-      if (target == null) {
-        mc.player.displayClientMessage(
-            Component.literal(ThidaMessages.text("message.thida.ruen.no_target")), true);
+      if (target == null || data.getCompound("ruenAssigned").contains(target.getStringUUID()))
         return;
-      }
       // Send the click's facing before asking the server to resolve the ray.
       var player = mc.player;
       player.connection.send(
           new ServerboundMovePlayerPacket.Rot(
               player.getYRot(), player.getXRot(), player.onGround()));
-      ruenRequest(pick.action(), pick.activation(), "", target.getUUID());
+      ruenRequest("ruen_pick_" + pick.side(), pick.activation(), "", target.getUUID());
     }
   }
 
@@ -268,7 +347,7 @@ public final class ThidaClient {
             };
     String[] icons =
         kind.equals("narotra_doll")
-            ? new String[] {"shield", "cleanse", "speed"}
+            ? new String[] {"shield", "cleanse", "heal_speed"}
             : new String[] {"weak", "bleed", "vulnerable"};
     var rows = new ArrayList<Choice>();
     for (int i = 0; i < 3; i++) {
@@ -417,43 +496,48 @@ public final class ThidaClient {
       super.render(g, mouseX, mouseY, partial);
       int wanted = ThidaGui.width(title.getString()) + 20;
       var statuses = new ArrayList<String>();
+      int listHeight = 0;
       for (var row : rows) {
         String why = reason(row);
-        String status = why.isEmpty() ? ThidaMessages.text("ui.thida.client.render.1") : why;
-        statuses.add(status);
-        wanted =
-            Math.max(
-                wanted, Math.max(ThidaGui.width(row.title()) + 48, ThidaGui.width(status) + 57));
+        statuses.add(why);
+        listHeight += why.isEmpty() ? 27 : 35;
+        wanted = Math.max(wanted, ThidaGui.width(row.title()) + 48);
+        if (!why.isEmpty()) wanted = Math.max(wanted, ThidaGui.width(why) + 57);
       }
       int w = HudPacking.limit(((wanted + 7) / 8) * 8, 180, Math.min(272, width - 16));
-      int h = 51 + rows.size() * 35, x = (width - w) / 2, y = Math.max(8, (height - h) / 2);
-      ThidaGui.frame(g, x, y, w, h, 0xFF91DAC2, true);
-      ThidaGui.text(g, title.getString(), x + 10, y + 8, w - 20, ThidaGui.TEXT);
+      int h = 51 + listHeight, x = (width - w) / 2, y = Math.max(8, (height - h) / 2);
+      ThidaHudTheme.popup(g, x, y, w, h, 22);
+      ThidaGui.text(g, title.getString(), x + 10, y + 8, w - 20, ThidaHudTheme.ON_DARK);
+      int ry = y + 25;
       for (int i = 0; i < rows.size(); i++) {
         var row = rows.get(i);
-        String reason = reason(row);
+        String reason = statuses.get(i);
+        boolean available = reason.isEmpty();
         boolean active = i == selected;
-        int ry = y + 25 + i * 35;
-        if (active) ThidaGui.frame(g, x + 5, ry, w - 10, 32, 0xFF91DAC2, true);
-        ThidaGui.icon(g, row.icon(), x + 11, ry + 6, 1);
+        int tileHeight = available ? 24 : 32, iconY = ry + (tileHeight - 20) / 2;
+        ThidaHudTheme.menuTile(g, x + 6, ry, w - 12, tileHeight, active, false, !available);
+        g.fill(x + 10, iconY, x + 30, iconY + 20, 0xFFE5C390);
+        ThidaGui.icon(g, row.icon(), x + 12, iconY + 2, 1);
         ThidaGui.text(
             g,
             (active ? "› " : "  ") + row.title(),
             x + 34,
-            ry + 5,
+            ry + (available ? 8 : 5),
             w - 48,
-            reason.isEmpty() ? ThidaGui.TEXT : ThidaGui.MUTED);
-        String status = statuses.get(i);
-        ThidaGui.text(
-            g, status, x + 43, ry + 19, w - 57, reason.isEmpty() ? ThidaGui.MUTED : ThidaGui.GOLD);
+            active && available
+                ? ThidaHudTheme.ACTIVE
+                : available ? ThidaHudTheme.INK : ThidaHudTheme.SECONDARY);
+        if (!available) ThidaGui.text(g, reason, x + 43, ry + 19, w - 57, ThidaHudTheme.RESTING);
+        ry += tileHeight + 3;
       }
+      ThidaHudTheme.rule(g, x + 9, ry + 1, w - 18);
       ThidaGui.fittedText(
           g,
           ThidaMessages.text("ui.thida.client.render.2"),
           x + 10,
-          y + 25 + rows.size() * 35 + 6,
+          ry + 6,
           w - 20,
-          ThidaGui.MUTED);
+          ThidaHudTheme.SECONDARY);
     }
   }
 

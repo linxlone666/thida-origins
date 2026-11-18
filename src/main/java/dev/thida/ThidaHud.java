@@ -197,7 +197,7 @@ public final class ThidaHud {
     g.pose().translate(area.x(), area.y(), 0);
     g.pose().scale(area.scale(), area.scale(), 1);
     for (var cell : flow(sampleBadges()).cells())
-      g.renderOutline(cell.x(), cell.y(), cell.width(), BADGE_HEIGHT, ThidaGui.GOLD);
+      g.renderOutline(cell.x(), cell.y(), cell.width(), BADGE_HEIGHT, ThidaHudTheme.SELECTION);
     g.pose().popPose();
   }
 
@@ -269,7 +269,7 @@ public final class ThidaHud {
     if (!preview && !data.getString("player").equals(mc.player.getUUID().toString())) return;
     List<Badge> badges = new ArrayList<>();
     if (data.getBoolean("thida")) {
-      String[][] effects = {{"weak", "bleed", "vulnerable"}, {"shield", "cleanse", "speed"}};
+      String[][] effects = {{"weak", "bleed", "vulnerable"}, {"shield", "cleanse", "heal_speed"}};
       String[] dolls = {"nilakan_doll", "narotra_doll"};
       for (int i = 0; i < 2; i++) {
         for (int mode = 0; mode < 3; mode++) {
@@ -352,11 +352,11 @@ public final class ThidaHud {
       var cell = flow.cells().get(i);
       int bx = cell.x(), by = cell.y(), width = cell.width();
       boolean active = badge.phase() == HudTimeline.Phase.ACTIVE;
-      int color = active ? 0xFF91DAC2 : ThidaGui.GOLD;
-      ThidaGui.hudPanel(g, bx, by, width, BADGE_HEIGHT, color);
+      int color = active ? ThidaHudTheme.ACTIVE : ThidaHudTheme.RESTING;
+      ThidaHudTheme.panel(g, bx, by, width, BADGE_HEIGHT, color);
       int iconX = bx + (width - 16) / 2;
       ThidaGui.icon(g, badge.icon(), iconX, by + 3, 1);
-      if (!active) g.fill(iconX, by + 3, iconX + 16, by + 19, 0x88211D2D);
+      if (!active) g.fill(iconX, by + 3, iconX + 16, by + 19, ThidaHudTheme.ICON_VEIL);
       String timer = badge.sustained() ? "∞" : ThidaHudState.time(badge.ticks());
       ThidaGui.text(
           g,
@@ -371,7 +371,7 @@ public final class ThidaHud {
               : active
                   ? badge.ticks() / (float) Math.max(1, badge.total())
                   : ThidaGui.progress(badge.ticks(), badge.total());
-      ThidaGui.bar(g, bx + 3, by + 32, width - 6, progress, color);
+      ThidaHudTheme.bar(g, bx + 3, by + 31, width - 6, progress, color);
     }
     g.pose().popPose();
   }

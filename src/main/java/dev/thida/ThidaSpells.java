@@ -122,12 +122,24 @@ public final class ThidaSpells {
         n.putLong("priorBlindUntil", time + previous.getDuration());
         n.putInt("priorBlindAmp", previous.getAmplifier());
       }
-      target.addEffect(new MobEffectInstance(MobEffects.BLINDNESS, 100, 0));
+      boolean conceal =
+          previous == null
+              || previous.getAmplifier() == 0
+                  && previous.getDuration() >= 0
+                  && previous.getDuration() < 100;
+      target.addEffect(
+          new MobEffectInstance(
+              MobEffects.BLINDNESS,
+              100,
+              0,
+              false,
+              !conceal && previous.isVisible(),
+              !conceal && previous.showIcon()));
       if (target.hasEffect(MobEffects.BLINDNESS)
           && target.getEffect(MobEffects.BLINDNESS).getAmplifier() == 0
           && target.getEffect(MobEffects.BLINDNESS).getDuration() <= 100)
         target.getPersistentData().putUUID("thida_spell_blind_owner", owner.getUUID());
-      target.addEffect(new MobEffectInstance(ThidaMod.SPELL_BLEED, 100));
+      target.addEffect(new MobEffectInstance(ThidaMod.SPELL_BLEED, 100, 0, false, false, false));
       n.putBoolean("bleedStarted", target.hasEffect(ThidaMod.SPELL_BLEED));
     }
     apply(target, owner.getUUID(), kind, n);

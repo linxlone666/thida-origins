@@ -13,20 +13,19 @@ import net.minecraft.network.chat.Component;
 /** Only the server builds the roster and commits membership. This screen edits a local draft. */
 final class ThidaRuenMenu extends Screen {
   private static final int ROW_HEIGHT = 19;
-  private static final int ACCENT = 0xFF91DAC2;
+  private static final int LIST_TOP = 72;
 
   private record Row(UUID id, String name, int distance) {}
 
   private final UUID activation;
-  private final List<Button> rowButtons = new ArrayList<>();
   private CompoundTag latest;
-  private List<Row> rows = List.of();
   private String side = "inside", feedback = "";
   private UUID selected;
-  private boolean viewingMembers, loaded;
-  private int offset, ticks, pendingUntil;
+  private boolean loaded;
+  private int ticks, pendingUntil;
   private int left, top, panelWidth, panelHeight, rowCount;
-  private Button inside, outside, toggle, previous, next, aim, confirm;
+  private RosterButton inside, outside, aim, confirm;
+  private RosterColumn candidates, members;
 
   ThidaRuenMenu(UUID activation) {
     super(label(text("title")));
@@ -36,44 +35,27 @@ final class ThidaRuenMenu extends Screen {
 
   @Override
   protected void init() {
-    rowButtons.clear();
-    panelWidth = Math.min(width - 12, 288);
-    rowCount = Math.clamp((height - 116) / ROW_HEIGHT, 1, 6);
-    panelHeight = 104 + rowCount * ROW_HEIGHT;
+    panelWidth = Math.min(width - 12, 336);
+    rowCount = Math.clamp((height - 128) / ROW_HEIGHT, 1, 6);
+    panelHeight = 116 + rowCount * ROW_HEIGHT;
     left = (width - panelWidth) / 2;
     top = Math.max(2, (height - panelHeight) / 2);
     int x = left + 8, usable = panelWidth - 16, half = (usable - 4) / 2;
-    inside = button("", x, top + 20, half, () -> changeSide("inside"));
-    outside = button("", x + half + 4, top + 20, usable - half - 4, () -> changeSide("outside"));
-    previous = button("‹", x, top + 40, 22, () -> move(-rowCount));
-    next = button("›", x + usable - 22, top + 40, 22, () -> move(rowCount));
-    toggle =
+    inside = button("", x, top + 28, half, 21, Tone.TAB, () -> changeSide("inside"));
+    inside.icon = "ruen_inside";
+    outside =
         button(
             "",
-            x + 26,
-            top + 40,
-            usable - 52,
-            () -> {
-              viewingMembers = !viewingMembers;
-              resetSelection();
-              refresh();
-            });
-    for (int i = 0; i < rowCount; i++) {
-      final int slot = i;
-      rowButtons.add(
-          button(
-              "",
-              x,
-              top + 60 + i * ROW_HEIGHT,
-              usable,
-              () -> {
-                if (!viewingMembers && offset + slot < rows.size()) {
-                  selected = rows.get(offset + slot).id();
-                  feedback = "";
-                  refresh();
-                }
-              }));
-    }
+            x + half + 4,
+            top + 28,
+            usable - half - 4,
+            21,
+            Tone.TAB,
+            () -> changeSide("outside"));
+    outside.icon = "ruen_outside";
+    int gap = 8, columnWidth = (usable - gap) / 2;
+    candidates = new RosterColumn(x, columnWidth, false);
+    members = new RosterColumn(x + columnWidth + gap, usable - columnWidth - gap, true);
     int bottom = top + panelHeight - 24, third = (usable - 8) / 3;
     aim =
         button(
@@ -81,6 +63,8 @@ final class ThidaRuenMenu extends Screen {
             x,
             bottom,
             third,
+            18,
+            Tone.PLAIN,
             () -> {
               onClose();
               ThidaClient.armRuenAim(activation, side);
@@ -91,6 +75,8 @@ final class ThidaRuenMenu extends Screen {
             x + third + 4,
             bottom,
             third,
+            18,
+            Tone.PRIMARY,
             () -> {
               if (selected == null) return;
               pendingUntil = ticks + 40;
@@ -103,6 +89,8 @@ final class ThidaRuenMenu extends Screen {
         x + 2 * (third + 4),
         bottom,
         usable - 2 * (third + 4),
+        18,
+        Tone.DANGER,
         () -> {
           ThidaClient.ruenRequest("ruen_cancel", activation, "", null);
           onClose();
@@ -111,9 +99,8 @@ final class ThidaRuenMenu extends Screen {
     requestRoster();
   }
 
-  private Button button(String name, int x, int y, int w, Runnable action) {
-    return addRenderableWidget(
-        Button.builder(label(name), unused -> action.run()).bounds(x, y, w, 17).build());
+  private RosterButton button(String name, int x, int y, int w, int h, Tone tone, Runnable action) {
+    return addRenderableWidget(new RosterButton(name, x, y, w, h, tone, action));
   }
 
   private void requestRoster() {
@@ -156,20 +143,12 @@ final class ThidaRuenMenu extends Screen {
   }
 
   private void changeSide(String nextSide) {
+    if (side.equals(nextSide)) return;
     side = nextSide;
-    viewingMembers = false;
-    resetSelection();
-    refresh();
-  }
-
-  private void resetSelection() {
-    offset = 0;
+    candidates.offset = 0;
+    members.offset = 0;
     selected = null;
     if (pendingUntil == 0) feedback = "";
-  }
-
-  private void move(int delta) {
-    offset = Math.clamp(offset + delta, 0, Math.max(0, rows.size() - rowCount));
     refresh();
   }
 
@@ -178,10 +157,10 @@ final class ThidaRuenMenu extends Screen {
     return ThidaHudState.snapshot().getInt(team.equals("inside") ? "ruenInside" : "ruenOutside");
   }
 
-  private void refresh() {
+  private List<Row> readRows(String key) {
     var updated = new ArrayList<Row>();
     if (latest != null) {
-      var list = latest.getList(viewingMembers ? side : "candidates", Tag.TAG_COMPOUND);
+      var list = latest.getList(key, Tag.TAG_COMPOUND);
       for (int i = 0; i < list.size(); i++) {
         var entry = list.getCompound(i);
         if (entry.hasUUID("id"))
@@ -189,51 +168,38 @@ final class ThidaRuenMenu extends Screen {
               new Row(entry.getUUID("id"), entry.getString("name"), entry.getInt("distance")));
       }
     }
-    rows = updated;
-    offset = Math.min(offset, Math.max(0, rows.size() - rowCount));
+    return updated;
+  }
+
+  private void refresh() {
+    candidates.rows = readRows("candidates");
+    members.rows = readRows(side);
     if (selected != null && selectedRow() == null && pendingUntil == 0) {
       selected = null;
       feedback = "no_target";
     }
-    inside.setMessage(label(teamLabel("inside")));
-    outside.setMessage(label(teamLabel("outside")));
-    toggle.setMessage(label(text(viewingMembers ? "show_available" : "show_members")));
-    previous.active = offset > 0;
-    next.active = offset + rowCount < rows.size();
+    inside.marked = side.equals("inside");
+    outside.marked = side.equals("outside");
+    inside.active = outside.active = pendingUntil == 0;
+    inside.setCaption(text("inside"), count("inside") + "/" + ThidaRuenSaneha.CAPACITY);
+    outside.setCaption(text("outside"), count("outside") + "/" + ThidaRuenSaneha.CAPACITY);
     boolean canChoose = count(side) < ThidaRuenSaneha.CAPACITY && pendingUntil == 0;
     aim.active = canChoose;
-    confirm.active = canChoose && !viewingMembers && selectedRow() != null;
-    for (int i = 0; i < rowButtons.size(); i++) {
-      var button = rowButtons.get(i);
-      button.visible = offset + i < rows.size();
-      button.active = button.visible && !viewingMembers && canChoose;
-      if (!button.visible) continue;
-      var row = rows.get(offset + i);
-      String rowText = (row.id().equals(selected) ? "› " : "") + row.name();
-      if (row.distance() >= 0) rowText += "   " + row.distance() + " " + text("blocks");
-      button.setMessage(label(rowText));
-    }
-  }
-
-  private String teamLabel(String team) {
-    return (side.equals(team) ? "› " : "")
-        + text(team)
-        + " "
-        + count(team)
-        + "/"
-        + ThidaRuenSaneha.CAPACITY;
+    confirm.active = canChoose && selectedRow() != null;
+    candidates.refresh(canChoose);
+    members.refresh(false);
   }
 
   private Row selectedRow() {
-    for (var row : rows) if (row.id().equals(selected)) return row;
+    for (var row : candidates.rows) if (row.id().equals(selected)) return row;
     return null;
   }
 
   @Override
   public boolean mouseScrolled(double x, double y, double horizontal, double vertical) {
-    if (vertical == 0) return false;
-    move(vertical < 0 ? 1 : -1);
-    return true;
+    if (vertical == 0 || y < top + 52 || y >= top + panelHeight - 44) return false;
+    if (candidates.containsX(x)) return candidates.move(vertical < 0 ? 1 : -1);
+    return members.containsX(x) && members.move(vertical < 0 ? 1 : -1);
   }
 
   @Override
@@ -250,28 +216,185 @@ final class ThidaRuenMenu extends Screen {
 
   @Override
   public void render(GuiGraphics g, int mouseX, int mouseY, float partial) {
-    ThidaGui.frame(g, left, top, panelWidth, panelHeight, ACCENT, true);
-    ThidaGui.text(g, text("title"), left + 8, top + 6, panelWidth - 60, ThidaGui.TEXT);
+    ThidaHudTheme.popup(g, left, top, panelWidth, panelHeight, 24);
+    ThidaGui.icon(g, "domain", left + 8, top + 4, 1);
+    ThidaGui.text(g, text("title"), left + 28, top + 9, panelWidth - 76, ThidaHudTheme.ON_DARK);
     String time =
         ThidaHudState.time(ThidaHudState.remaining(ThidaHudState.snapshot().getLong("domain")));
-    ThidaGui.fittedText(g, time, left + panelWidth - 43, top + 6, 35, ThidaGui.GOLD);
-    if (rows.isEmpty())
-      ThidaGui.text(
-          g,
-          text(!loaded ? "loading" : viewingMembers ? "empty_members" : "empty_candidates"),
-          left + 10,
-          top + 63,
-          panelWidth - 20,
-          ThidaGui.MUTED);
+    ThidaGui.fittedText(g, time, left + panelWidth - 43, top + 9, 35, ThidaHudTheme.SELECTION);
+    candidates.render(g);
+    members.render(g);
+    g.fill(members.x - 4, top + 53, members.x - 3, top + panelHeight - 48, 0xFFBC926C);
     Row row = selectedRow();
     String status =
         pendingUntil != 0 || !feedback.isEmpty()
             ? text(feedback)
-            : row == null
-                ? text(viewingMembers ? "roster_locked" : "pick_hint")
-                : text("confirm_to") + " " + text(side) + ": " + row.name();
-    ThidaGui.text(g, status, left + 8, top + panelHeight - 39, panelWidth - 16, ThidaGui.GOLD);
+            : count(side) >= ThidaRuenSaneha.CAPACITY
+                ? text("full")
+                : row == null ? "" : text("confirm_to") + " " + text(side) + ": " + row.name();
+    ThidaHudTheme.rule(g, left + 8, top + panelHeight - 44, panelWidth - 16);
+    ThidaGui.text(
+        g,
+        status,
+        left + 8,
+        top + panelHeight - 40,
+        panelWidth - 16,
+        row != null || !feedback.isEmpty() ? ThidaHudTheme.ACTIVE : ThidaHudTheme.SECONDARY);
     super.render(g, mouseX, mouseY, partial);
+  }
+
+  private final class RosterColumn {
+    private final int x, width;
+    private final boolean locked;
+    private final List<RosterButton> buttons = new ArrayList<>();
+    private final RosterButton previous, next;
+    private List<Row> rows = List.of();
+    private int offset;
+
+    RosterColumn(int x, int width, boolean locked) {
+      this.x = x;
+      this.width = width;
+      this.locked = locked;
+      previous = button("‹", x + width - 33, top + 53, 15, 15, Tone.PLAIN, () -> move(-rowCount));
+      next = button("›", x + width - 15, top + 53, 15, 15, Tone.PLAIN, () -> move(rowCount));
+      for (int i = 0; i < rowCount; i++) {
+        final int slot = i;
+        var entry =
+            button(
+                "",
+                x,
+                top + LIST_TOP + i * ROW_HEIGHT,
+                width,
+                17,
+                Tone.ROW,
+                () -> {
+                  if (locked || offset + slot >= rows.size()) return;
+                  selected = rows.get(offset + slot).id();
+                  feedback = "";
+                  ThidaRuenMenu.this.refresh();
+                });
+        entry.readOnly = locked;
+        buttons.add(entry);
+      }
+    }
+
+    boolean containsX(double mouseX) {
+      return mouseX >= x && mouseX < x + width;
+    }
+
+    boolean move(int delta) {
+      int nextOffset = Math.clamp(offset + delta, 0, Math.max(0, rows.size() - rowCount));
+      if (nextOffset == offset) return false;
+      offset = nextOffset;
+      ThidaRuenMenu.this.refresh();
+      return true;
+    }
+
+    void refresh(boolean canChoose) {
+      offset = Math.min(offset, Math.max(0, rows.size() - rowCount));
+      previous.visible = next.visible = rows.size() > rowCount;
+      previous.active = offset > 0;
+      next.active = offset + rowCount < rows.size();
+      for (int i = 0; i < buttons.size(); i++) {
+        var entry = buttons.get(i);
+        entry.visible = offset + i < rows.size();
+        entry.active = entry.visible && !locked && canChoose;
+        if (!entry.visible) continue;
+        var row = rows.get(offset + i);
+        entry.marked = !locked && row.id().equals(selected);
+        entry.setCaption(
+            row.name(), row.distance() < 0 ? "" : row.distance() + " " + text("blocks"));
+      }
+    }
+
+    void render(GuiGraphics g) {
+      ThidaGui.text(
+          g,
+          text(locked ? "column_members" : "column_candidates"),
+          x + 2,
+          top + 56,
+          width - (previous.visible ? 39 : 4),
+          ThidaHudTheme.ACTIVE);
+      if (rows.isEmpty()) {
+        ThidaHudTheme.menuTile(g, x, top + LIST_TOP, width, 17, false, false, true);
+        ThidaGui.text(
+            g,
+            text(!loaded ? "loading" : locked ? "empty_members" : "empty_candidates"),
+            x + 6,
+            top + LIST_TOP + 4,
+            width - 12,
+            ThidaHudTheme.SECONDARY);
+      }
+    }
+  }
+
+  private enum Tone {
+    PLAIN,
+    TAB,
+    ROW,
+    PRIMARY,
+    DANGER
+  }
+
+  /** Vanilla button behavior and narration with the roster's own visual states. */
+  private static final class RosterButton extends Button {
+    private final Tone tone;
+    private String caption, detail = "", icon = "";
+    private boolean marked, readOnly;
+
+    RosterButton(String caption, int x, int y, int w, int h, Tone tone, Runnable action) {
+      super(x, y, w, h, label(caption), unused -> action.run(), DEFAULT_NARRATION);
+      this.caption = caption;
+      this.tone = tone;
+    }
+
+    void setCaption(String caption, String detail) {
+      this.caption = caption;
+      this.detail = detail;
+      setMessage(label(detail.isEmpty() ? caption : caption + " " + detail));
+    }
+
+    @Override
+    protected void renderWidget(GuiGraphics g, int mouseX, int mouseY, float partial) {
+      int x = getX(), y = getY(), w = getWidth(), h = getHeight();
+      boolean hover = active && isHoveredOrFocused();
+      boolean dark = tone == Tone.PRIMARY && active || tone == Tone.TAB && marked;
+      int ink =
+          dark
+              ? ThidaHudTheme.ON_DARK
+              : tone == Tone.DANGER || marked
+                  ? ThidaHudTheme.ACTIVE
+                  : active || readOnly ? ThidaHudTheme.INK : ThidaHudTheme.RESTING;
+      if (dark) {
+        g.fill(x, y, x + w, y + h, 0xFF54223B);
+        g.fill(x + 1, y + 1, x + w - 1, y + h - 1, hover ? 0xFF9A305F : 0xFF792344);
+      } else {
+        ThidaHudTheme.menuTile(g, x, y, w, h, marked, hover, !active);
+        if (tone == Tone.DANGER && active)
+          g.fill(x + 3, y + h - 2, x + w - 3, y + h - 1, 0xFFBD6C7D);
+      }
+      if (hover && isFocused()) g.renderOutline(x, y, w, h, ThidaHudTheme.ACTIVE);
+      int textY = y + (h - 9) / 2;
+      if (tone == Tone.ROW || tone == Tone.TAB) {
+        int start = x + (tone == Tone.TAB ? 24 : 8), right = x + w - 7;
+        if (!icon.isEmpty()) ThidaGui.icon(g, icon, x + 5, y + (h - 16) / 2, 1);
+        if (!detail.isEmpty()) {
+          int detailWidth = Math.min(Math.max(0, w / 3), ThidaGui.width(detail));
+          ThidaGui.fittedText(
+              g,
+              detail,
+              right - detailWidth,
+              textY,
+              detailWidth,
+              dark ? ThidaHudTheme.ON_DARK : ThidaHudTheme.RESTING);
+          right -= detailWidth + 7;
+        }
+        ThidaGui.text(g, caption, start, textY, right - start, ink);
+      } else {
+        int textWidth = Math.max(0, Math.min(w - 8, ThidaGui.width(caption)));
+        ThidaGui.fittedText(g, caption, x + (w - textWidth) / 2, textY, textWidth, ink);
+      }
+    }
   }
 
   private static String text(String key) {

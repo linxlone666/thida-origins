@@ -167,9 +167,10 @@ public final class ThidaBondHud {
     g.pose().pushPose();
     g.pose().translate(area.x(), area.y(), 0);
     g.pose().scale(area.scale(), area.scale(), 1);
-    ThidaGui.hudPanel(g, 0, 0, width, 21 + rows.size() * 34, 0xFF91DAC2);
+    ThidaHudTheme.panel(g, 0, 0, width, 21 + rows.size() * 34, ThidaHudTheme.ACTIVE);
     ThidaGui.text(
-        g, ThidaMessages.text("ui.thida.bondhud.drawbonds.4"), 7, 6, width - 14, ThidaGui.TEXT);
+        g, ThidaMessages.text("ui.thida.bondhud.drawbonds.4"), 7, 6, width - 14, ThidaHudTheme.INK);
+    ThidaHudTheme.rule(g, 7, 17, width - 14);
     for (int i = 0; i < rows.size(); i++) {
       var row = rows.get(i);
       var n = row.data();
@@ -179,7 +180,7 @@ public final class ThidaBondHud {
         PlayerFaceRenderer.draw(g, skin(UUID.fromString(n.getString("id"))), 25, ry + 4, 18);
       } catch (IllegalArgumentException ignored) {
       }
-      ThidaGui.text(g, n.getString("name"), 49, ry + 2, width - 56, ThidaGui.TEXT);
+      ThidaGui.text(g, n.getString("name"), 49, ry + 2, width - 56, ThidaHudTheme.INK);
       String kind = ThidaMessages.text("hud.thida.kind." + icon(row));
       boolean available = n.getBoolean("available");
       String value =
@@ -189,21 +190,27 @@ public final class ThidaBondHud {
               : n.getString("status");
       if (!available && value.isBlank()) value = ThidaMessages.text("hud.thida.paused");
       int valueWidth = Math.min(width - 56, available ? numberWidth(n) : ThidaGui.width(value));
-      ThidaGui.text(g, kind, 49, ry + 15, Math.max(0, width - 62 - valueWidth), ThidaGui.MUTED);
+      ThidaGui.text(
+          g, kind, 49, ry + 15, Math.max(0, width - 62 - valueWidth), ThidaHudTheme.SECONDARY);
       ThidaGui.fittedText(
           g,
           value,
           width - 7 - valueWidth,
           ry + 15,
           valueWidth,
-          available ? 0xFF91DAC2 : ThidaGui.GOLD);
+          available ? ThidaHudTheme.ACTIVE : ThidaHudTheme.RESTING);
       if (available) {
         float health = n.getFloat("maxHp") > 0 ? n.getFloat("hp") / n.getFloat("maxHp") : 0;
-        ThidaGui.bar(g, 49, ry + 28, Math.min(108, width - 56), health, 0xFF91DAC2);
+        ThidaHudTheme.bar(g, 49, ry + 28, Math.min(108, width - 56), health, ThidaHudTheme.ACTIVE);
       } else {
         // Never present cached offline HP as a current measurement.
         ThidaGui.text(
-            g, ThidaMessages.text("hud.thida.hp_unknown"), 49, ry + 26, width - 56, ThidaGui.MUTED);
+            g,
+            ThidaMessages.text("hud.thida.hp_unknown"),
+            49,
+            ry + 26,
+            width - 56,
+            ThidaHudTheme.SECONDARY);
       }
     }
     g.pose().popPose();
@@ -222,7 +229,7 @@ public final class ThidaBondHud {
                   data.getBoolean("used") ? "hud.thida.save_used" : "hud.thida.save_ready"),
               0));
     String[] keys = {"ward", "speed", "invulnerable"};
-    String[] icons = {"cleanse", "speed", "shield"};
+    String[] icons = {"ward", "speed", "shield"};
     for (int i = 0; i < keys.length; i++) {
       long ticks =
           preview
@@ -288,21 +295,21 @@ public final class ThidaBondHud {
       var c = flow.cells().get(i);
       ThidaGui.icon(g, s.icon(), c.x() + 2, c.y() + 3, 1);
       int timerWidth = s.ticks() > 0 ? ThidaGui.width("888:88") : 0;
-      ThidaGui.text(
+      ThidaHudTheme.floatingText(
           g,
           s.label(),
           c.x() + 22,
           c.y() + 7,
           c.width() - 24 - (timerWidth > 0 ? timerWidth + 4 : 0),
-          ThidaGui.TEXT);
+          false);
       if (timerWidth > 0)
-        ThidaGui.text(
+        ThidaHudTheme.floatingText(
             g,
             ThidaHudState.time(s.ticks()),
             c.x() + c.width() - timerWidth - 2,
             c.y() + 7,
             timerWidth,
-            ThidaGui.TEXT);
+            true);
     }
     g.pose().popPose();
   }

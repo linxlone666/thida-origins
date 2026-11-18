@@ -236,6 +236,15 @@ public final class ThidaPassiveEffects {
 
   private static Set<UUID> recipients(MinecraftServer server, ThidaEffectEvent message) {
     Set<UUID> result = new HashSet<>();
+    // Private combat/faction details must not be exposed by an installed effect adapter.
+    if (message.power().equals(ThidaRuenSaneha.ID)
+            && message.event().equals("RUEN_MEMBER_SELECTED")
+            && message.spell().equals("outside")
+        || message.power().equals("nilakan_doll")
+            && (message.component().equals("spell") || message.event().equals("SPELL_CAST"))) {
+      if (message.owner() != null) result.add(message.owner());
+      return result;
+    }
     Audience audience;
     try {
       audience = audiencePolicy.audience(message);

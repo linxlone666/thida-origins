@@ -544,7 +544,7 @@ public final class ThidaBonds {
       if (event.getNewDamage() > 0) {
         data(victim).putLong("heartBleed", now(victim.server) + 200);
         data(victim).putLong("heartNextBleed", now(victim.server) + 20);
-        victim.addEffect(new MobEffectInstance(ThidaMod.HEART_BLEED, 200));
+        victim.addEffect(new MobEffectInstance(ThidaMod.HEART_BLEED, 200, 0, false, false, false));
         if (!victim.hasEffect(ThidaMod.HEART_BLEED)) {
           data(victim).remove("heartBleed");
           data(victim).remove("heartNextBleed");

@@ -435,6 +435,10 @@ public final class ThidaRuenSaneha {
       data.putUUID("ruenActivation", domain.getUUID("activation"));
       data.putInt("ruenInside", domain.getCompound(Side.INSIDE.key).size());
       data.putInt("ruenOutside", domain.getCompound(Side.OUTSIDE.key).size());
+      var assigned = new CompoundTag();
+      for (Side side : Side.values())
+        for (String id : domain.getCompound(side.key).getAllKeys()) assigned.putBoolean(id, true);
+      data.put("ruenAssigned", assigned);
       var anchor = new CompoundTag();
       for (String axis : List.of("x", "y", "z")) anchor.putDouble(axis, domain.getDouble(axis));
       anchor.putString("dimension", domain.getString("dimension"));
